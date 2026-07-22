@@ -2,15 +2,16 @@
 import React, { useState } from 'react';
 import type { Player, StoreItem } from '../types';
 import { useAuth } from '../hooks/useAuth';
-// Fix: Import missing functions 'purchaseEmote', 'purchaseDuoCard', 'updatePlayerCoins', and 'updatePlayerGems'.
 import { purchaseBird, purchaseInsect, purchaseCurrency, purchaseEmote, purchaseDuoCard, updatePlayerCoins, updatePlayerGems, purchaseNameChangeCard, purchaseCustomCard } from '../services/playerService';
+import { rtdb } from '../services/firebase';
+import firebase from 'firebase/compat/app';
 import Button from './common/Button';
 import { Spinner } from './common/Spinner';
 import { useContentConfig } from '../hooks/useContentConfig';
 import { toast } from 'react-toastify';
 import { BIRD_DEFINITIONS } from '../constants';
 import BirdIcon from './common/BirdIcon';
-import { Coins, Gem, Swords } from 'lucide-react';
+import { Coins, Gem, Swords, Sparkles } from 'lucide-react';
 
 interface StoreScreenProps {
   player: Player;
@@ -86,9 +87,84 @@ const StoreScreen: React.FC<StoreScreenProps> = ({ player }) => {
     return false;
   });
 
+  const [starterPackLoading, setStarterPackLoading] = useState(false);
+  const hasStarterPack = player.hasPurchasedStarterPack || false;
+
+  const handleStarterPackPurchase = async () => {
+    if (!user) return;
+    setStarterPackLoading(true);
+    try {
+      const updates: { [key: string]: any } = {};
+      updates[`users/${user.uid}/hasPurchasedStarterPack`] = true;
+      updates[`users/${user.uid}/coins`] = firebase.database.ServerValue.increment(5000);
+      updates[`users/${user.uid}/gems`] = firebase.database.ServerValue.increment(100);
+      const eagleDef = BIRD_DEFINITIONS['B005'];
+      if (eagleDef) {
+        updates[`users/${user.uid}/ownedBirds/B005`] = {
+          id: eagleDef.id, name: eagleDef.name, rarity: eagleDef.rarity,
+          skillDescription: eagleDef.skillDescription, skillPower: eagleDef.baseAttackPower,
+          level: 1, xp: 0, xpToNextLevel: eagleDef.baseXpToNextLevel, icon: eagleDef.icon,
+          maxHealth: eagleDef.baseHealth, powerLevel: 1, healthLevel: 1,
+          abilityType: eagleDef.abilityType, abilityValue: eagleDef.abilityValue,
+          abilityCooldown: eagleDef.abilityCooldown, abilityDescription: eagleDef.abilityDescription,
+        };
+      }
+      updates[`users/${user.uid}/inventory/insects/I001`] = firebase.database.ServerValue.increment(50);
+      await rtdb.ref().update(updates);
+      toast.success('🔥 Starter Pack Purchased! Check your inventory!');
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setStarterPackLoading(false);
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       <h2 className="text-xl text-center font-bold text-yellow-400 flex-shrink-0 mb-2">Store</h2>
+
+      {/* Starter Pack Banner */}
+      {!hasStarterPack ? (
+        <div className="flex-shrink-0 mb-2 p-3 bg-gradient-to-r from-orange-600/30 via-amber-600/20 to-orange-600/30 border-2 border-orange-400 rounded-lg shadow-[0_0_15px_rgba(251,146,60,0.2)] relative overflow-hidden group cursor-pointer" onClick={handleStarterPackPurchase}>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <span className="text-5xl drop-shadow-lg">🎁</span>
+              <Sparkles size={16} className="absolute -top-1 -right-1 text-yellow-400 animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-sm text-orange-300 flex items-center gap-1">
+                🔥 STARTER PACK
+                <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">LIMITED</span>
+              </h3>
+              <p className="text-[10px] text-gray-300 mt-0.5">Epic Bird • 100 Gems • 5,000 Coins • 50 Insects</p>
+              <div className="flex gap-2 mt-1">
+                {[
+                  { icon: '🦅', label: 'Eagle Eye' },
+                  { icon: '💎', label: '100 Gems' },
+                  { icon: '💰', label: '5,000' },
+                  { icon: '🐛', label: 'x50' },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-0.5 bg-black/40 px-1.5 py-0.5 rounded-full text-[9px]">
+                    <span>{item.icon}</span>
+                    <span className="text-gray-300">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="text-center flex-shrink-0">
+              <div className="text-lg font-bold text-orange-400">৳50</div>
+              <Button className="!py-1 !px-3 !text-[10px] !bg-orange-500 !border-orange-400 hover:!bg-orange-600" disabled={starterPackLoading}>
+                {starterPackLoading ? <Spinner /> : 'BUY'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-shrink-0 mb-2 p-2 bg-gray-800/50 border border-gray-600 rounded-lg text-center">
+          <p className="text-[11px] text-gray-400">✅ Starter Pack purchased</p>
+        </div>
+      )}
 
       <div className="flex border-b-2 border-black flex-shrink-0">
         <button 

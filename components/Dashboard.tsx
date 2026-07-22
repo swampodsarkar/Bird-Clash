@@ -43,9 +43,7 @@ import LottieBird from './common/LottieBird';
 import { ReferralModal } from './common/ReferralModal';
 import { LimitedEventBanner } from './common/LimitedEventBanner';
 import { applyReferralCode } from '../services/referralService';
-import RewardWheel from './common/RewardWheel';
-import type { RewardSlot } from './common/RewardWheel';
-import StarterPackModal from './common/StarterPackModal';
+
 import PingIndicator from './common/PingIndicator';
 import { checkAchievements, updateMatchStats } from '../services/achievementService';
 import AchievementModal from './common/AchievementModal';
@@ -149,10 +147,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const winterThemeActive = isWinterThemeActive();
   const [isCustomRoomModalOpen, setIsCustomRoomModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
-  const [isRewardWheelOpen, setIsRewardWheelOpen] = useState(false);
-  const [isStarterPackOpen, setIsStarterPackOpen] = useState(false);
   const [achievementToShow, setAchievementToShow] = useState<Achievement | null>(null);
-  const [spinResultMessage, setSpinResultMessage] = useState<string | null>(null);
   
   const [hasUnreadGlobalMessages, setHasUnreadGlobalMessages] = useState(false);
 
@@ -308,59 +303,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     
     // Feature Locking Logic for NPE
     const playerLevel = playerData.level || 1;
-  const freeSpinAvailable = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return playerData.lastFreeSpinDate !== today;
-  }, [playerData.lastFreeSpinDate]);
-
   const isNewPlayer = (playerData.totalMatches || 0) < 10;
   const hasStarterPack = playerData.hasPurchasedStarterPack || false;
-
-  const handleRewardWheelSpin = async (): Promise<{ reward: RewardSlot; index: number }> => {
-    const { REWARDS } = await import('./common/RewardWheel');
-    const randomIndex = Math.floor(Math.random() * REWARDS.length);
-    const reward = REWARDS[randomIndex];
-
-    const today = new Date().toISOString().split('T')[0];
-    const updates: { [key: string]: any } = {};
-    updates[`users/${playerData.uid}/lastFreeSpinDate`] = today;
-
-    if (reward.type === 'coins') {
-      updates[`users/${playerData.uid}/coins`] = firebase.database.ServerValue.increment(reward.amount);
-    } else if (reward.type === 'gems') {
-      updates[`users/${playerData.uid}/gems`] = firebase.database.ServerValue.increment(reward.amount);
-    } else if (reward.type === 'insect' && reward.insectId) {
-      updates[`users/${playerData.uid}/inventory/insects/${reward.insectId}`] = firebase.database.ServerValue.increment(reward.amount);
-    }
-
-    await rtdb.ref().update(updates);
-    setSpinResultMessage(`You won ${reward.amount > 0 ? `${reward.amount} ` : ''}${reward.label}!`);
-    return { reward, index: randomIndex };
-  };
-
-  const handleStarterPackPurchase = async () => {
-    const updates: { [key: string]: any } = {};
-    updates[`users/${playerData.uid}/hasPurchasedStarterPack`] = true;
-    updates[`users/${playerData.uid}/coins`] = firebase.database.ServerValue.increment(5000);
-    updates[`users/${playerData.uid}/gems`] = firebase.database.ServerValue.increment(100);
-    // Give Eagle Eye bird
-    const eagleDef = BIRD_DEFINITIONS['B005'];
-    if (eagleDef) {
-      updates[`users/${playerData.uid}/ownedBirds/B005`] = {
-        id: eagleDef.id, name: eagleDef.name, rarity: eagleDef.rarity,
-        skillDescription: eagleDef.skillDescription, skillPower: eagleDef.baseAttackPower,
-        level: 1, xp: 0, xpToNextLevel: eagleDef.baseXpToNextLevel, icon: eagleDef.icon,
-        maxHealth: eagleDef.baseHealth, powerLevel: 1, healthLevel: 1,
-        abilityType: eagleDef.abilityType, abilityValue: eagleDef.abilityValue,
-        abilityCooldown: eagleDef.abilityCooldown, abilityDescription: eagleDef.abilityDescription,
-      };
-    }
-    // Give 50 Common Worms
-    updates[`users/${playerData.uid}/inventory/insects/I001`] = firebase.database.ServerValue.increment(50);
-    await rtdb.ref().update(updates);
-    toast.success('🔥 Starter Pack Purchased! Check your inventory!');
-    setIsStarterPackOpen(false);
-  };
 
     const isSocialLocked = playerLevel < 3;
     const isEventsLocked = playerLevel < 5;
@@ -542,27 +486,26 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             {matchmakingError && <p className="text-red-400 text-[10px] font-bold text-center bg-red-900/30 p-0.5 rounded">{matchmakingError}</p>}
 
                             {/* Quick Actions Row */}
-                            <div className="flex gap-2 items-center justify-center pt-1">
+                            <div className="flex gap-2 items-center justify-center pt-1 flex-wrap">
                               {isNewPlayer && (
-                                <div className="flex items-center gap-1 text-[10px] text-green-400 font-bold bg-green-900/30 px-2 py-1 rounded border border-green-500/30">
-                                  🤖 Bot Protection ({10 - (playerData.totalMatches || 0)} matches left)
+                                <div className="relative group">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-bold bg-gradient-to-r from-green-900/60 to-emerald-900/60 px-3 py-1.5 rounded-full border border-green-500/40 text-green-300 shadow-[0_0_10px_rgba(74,222,128,0.15)]">
+                                    <span className="relative flex h-2 w-2">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                    </span>
+                                    🤖 Bot Protected
+                                    <span className="bg-green-600 text-white px-1.5 py-0.5 rounded-full text-[8px]">{10 - (playerData.totalMatches || 0)}</span>
+                                  </div>
+                                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/90 text-[10px] text-white px-2 py-1 rounded border border-green-500/30 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                    First 10 matches are against bots
+                                  </div>
                                 </div>
                               )}
-                              <button
-                                onClick={() => setIsRewardWheelOpen(true)}
-                                disabled={!freeSpinAvailable}
-                                className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border-2 transition-all ${
-                                  freeSpinAvailable
-                                    ? 'bg-yellow-500/20 border-yellow-400 text-yellow-400 hover:bg-yellow-500/30 animate-pulse'
-                                    : 'bg-gray-800/50 border-gray-600 text-gray-500 cursor-not-allowed'
-                                }`}
-                              >
-                                🎡 {freeSpinAvailable ? 'FREE SPIN' : 'SPUN ✓'}
-                              </button>
                               {!hasStarterPack && (
                                 <button
-                                  onClick={() => setIsStarterPackOpen(true)}
-                                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg border-2 border-orange-400 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all animate-pulse"
+                                  onClick={() => setActiveTab('STORE')}
+                                  className="text-[11px] font-bold px-3 py-1.5 rounded-full border-2 border-orange-400 bg-gradient-to-r from-orange-600/30 to-amber-600/30 text-orange-300 hover:from-orange-600/50 hover:to-amber-600/50 transition-all animate-pulse shadow-[0_0_10px_rgba(251,146,60,0.3)]"
                                 >
                                   🎁 STARTER PACK
                                 </button>
@@ -615,20 +558,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                         await applyReferralCode(playerData.uid, code);
                     }}
                 />
-            )}
-            {isRewardWheelOpen && (
-              <RewardWheel
-                onSpin={handleRewardWheelSpin}
-                freeSpinAvailable={freeSpinAvailable}
-                onClose={() => setIsRewardWheelOpen(false)}
-              />
-            )}
-            {isStarterPackOpen && (
-              <StarterPackModal
-                onPurchase={handleStarterPackPurchase}
-                onClose={() => setIsStarterPackOpen(false)}
-                price={50}
-              />
             )}
             {achievementToShow && (
               <AchievementModal
