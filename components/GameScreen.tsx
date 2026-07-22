@@ -16,6 +16,7 @@ import { soundManager } from '../utils/sound';
 import LottieBird from './common/LottieBird';
 import { AttackEffect, ShieldEffect, HealEffect, UltimateEffect, HitEffect } from './common/LottieEffects';
 import VictoryAnimation from './common/VictoryAnimation';
+import PingIndicator from './common/PingIndicator';
 
 interface ReportModalProps {
     opponentName: string;
@@ -863,6 +864,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           </div>
 
           <div className="flex flex-col items-center gap-1 bg-black/60 p-2 sm:p-3 border-2 border-black z-10 min-w-[100px]">
+            <PingIndicator />
             <h2 className="text-sm sm:text-lg font-bold text-yellow-400 text-center">
               {isGameActive ? (isMyTurn ? "YOUR TURN" : `${opponent.displayName}'s Turn`) : "MATCH OVER"}
             </h2>

@@ -30,7 +30,7 @@ import { Spinner } from './common/Spinner';
 import { toast } from 'react-toastify';
 import MembershipClaimModal from './common/MembershipClaimModal';
 import firebase from 'firebase/compat/app';
-import { DAILY_QUESTS } from '../constants';
+import { DAILY_QUESTS, BIRD_DEFINITIONS } from '../constants';
 import PlayerRankDisplay from './common/PlayerRankDisplay';
 import SeasonalEventModal from './common/SeasonalEventModal';
 import { useSettings } from '../hooks/useSettings';
@@ -43,6 +43,13 @@ import LottieBird from './common/LottieBird';
 import { ReferralModal } from './common/ReferralModal';
 import { LimitedEventBanner } from './common/LimitedEventBanner';
 import { applyReferralCode } from '../services/referralService';
+import RewardWheel from './common/RewardWheel';
+import type { RewardSlot } from './common/RewardWheel';
+import StarterPackModal from './common/StarterPackModal';
+import PingIndicator from './common/PingIndicator';
+import { checkAchievements, updateMatchStats } from '../services/achievementService';
+import AchievementModal from './common/AchievementModal';
+import type { Achievement } from '../services/achievementService';
 
 
 type Tab = 'CHALLENGE' | 'QUESTS' | 'BIRDS' | 'STORE' | 'ROYALE_PASS' | 'LUCK_ROYALE' | 'SOCIAL' | 'LEADERBOARD' | 'ESPORTS' | 'PROFILE';
@@ -142,6 +149,10 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const winterThemeActive = isWinterThemeActive();
   const [isCustomRoomModalOpen, setIsCustomRoomModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [isRewardWheelOpen, setIsRewardWheelOpen] = useState(false);
+  const [isStarterPackOpen, setIsStarterPackOpen] = useState(false);
+  const [achievementToShow, setAchievementToShow] = useState<Achievement | null>(null);
+  const [spinResultMessage, setSpinResultMessage] = useState<string | null>(null);
   
   const [hasUnreadGlobalMessages, setHasUnreadGlobalMessages] = useState(false);
 
@@ -297,6 +308,60 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     
     // Feature Locking Logic for NPE
     const playerLevel = playerData.level || 1;
+  const freeSpinAvailable = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return playerData.lastFreeSpinDate !== today;
+  }, [playerData.lastFreeSpinDate]);
+
+  const isNewPlayer = (playerData.totalMatches || 0) < 10;
+  const hasStarterPack = playerData.hasPurchasedStarterPack || false;
+
+  const handleRewardWheelSpin = async (): Promise<{ reward: RewardSlot; index: number }> => {
+    const { REWARDS } = await import('./common/RewardWheel');
+    const randomIndex = Math.floor(Math.random() * REWARDS.length);
+    const reward = REWARDS[randomIndex];
+
+    const today = new Date().toISOString().split('T')[0];
+    const updates: { [key: string]: any } = {};
+    updates[`users/${playerData.uid}/lastFreeSpinDate`] = today;
+
+    if (reward.type === 'coins') {
+      updates[`users/${playerData.uid}/coins`] = firebase.database.ServerValue.increment(reward.amount);
+    } else if (reward.type === 'gems') {
+      updates[`users/${playerData.uid}/gems`] = firebase.database.ServerValue.increment(reward.amount);
+    } else if (reward.type === 'insect' && reward.insectId) {
+      updates[`users/${playerData.uid}/inventory/insects/${reward.insectId}`] = firebase.database.ServerValue.increment(reward.amount);
+    }
+
+    await rtdb.ref().update(updates);
+    setSpinResultMessage(`You won ${reward.amount > 0 ? `${reward.amount} ` : ''}${reward.label}!`);
+    return { reward, index: randomIndex };
+  };
+
+  const handleStarterPackPurchase = async () => {
+    const updates: { [key: string]: any } = {};
+    updates[`users/${playerData.uid}/hasPurchasedStarterPack`] = true;
+    updates[`users/${playerData.uid}/coins`] = firebase.database.ServerValue.increment(5000);
+    updates[`users/${playerData.uid}/gems`] = firebase.database.ServerValue.increment(100);
+    // Give Eagle Eye bird
+    const eagleDef = BIRD_DEFINITIONS['B005'];
+    if (eagleDef) {
+      updates[`users/${playerData.uid}/ownedBirds/B005`] = {
+        id: eagleDef.id, name: eagleDef.name, rarity: eagleDef.rarity,
+        skillDescription: eagleDef.skillDescription, skillPower: eagleDef.baseAttackPower,
+        level: 1, xp: 0, xpToNextLevel: eagleDef.baseXpToNextLevel, icon: eagleDef.icon,
+        maxHealth: eagleDef.baseHealth, powerLevel: 1, healthLevel: 1,
+        abilityType: eagleDef.abilityType, abilityValue: eagleDef.abilityValue,
+        abilityCooldown: eagleDef.abilityCooldown, abilityDescription: eagleDef.abilityDescription,
+      };
+    }
+    // Give 50 Common Worms
+    updates[`users/${playerData.uid}/inventory/insects/I001`] = firebase.database.ServerValue.increment(50);
+    await rtdb.ref().update(updates);
+    toast.success('🔥 Starter Pack Purchased! Check your inventory!');
+    setIsStarterPackOpen(false);
+  };
+
     const isSocialLocked = playerLevel < 3;
     const isEventsLocked = playerLevel < 5;
     const isEsportsLocked = playerLevel < 10;
@@ -475,6 +540,35 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             </div>
 
                             {matchmakingError && <p className="text-red-400 text-[10px] font-bold text-center bg-red-900/30 p-0.5 rounded">{matchmakingError}</p>}
+
+                            {/* Quick Actions Row */}
+                            <div className="flex gap-2 items-center justify-center pt-1">
+                              {isNewPlayer && (
+                                <div className="flex items-center gap-1 text-[10px] text-green-400 font-bold bg-green-900/30 px-2 py-1 rounded border border-green-500/30">
+                                  🤖 Bot Protection ({10 - (playerData.totalMatches || 0)} matches left)
+                                </div>
+                              )}
+                              <button
+                                onClick={() => setIsRewardWheelOpen(true)}
+                                disabled={!freeSpinAvailable}
+                                className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border-2 transition-all ${
+                                  freeSpinAvailable
+                                    ? 'bg-yellow-500/20 border-yellow-400 text-yellow-400 hover:bg-yellow-500/30 animate-pulse'
+                                    : 'bg-gray-800/50 border-gray-600 text-gray-500 cursor-not-allowed'
+                                }`}
+                              >
+                                🎡 {freeSpinAvailable ? 'FREE SPIN' : 'SPUN ✓'}
+                              </button>
+                              {!hasStarterPack && (
+                                <button
+                                  onClick={() => setIsStarterPackOpen(true)}
+                                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg border-2 border-orange-400 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all animate-pulse"
+                                >
+                                  🎁 STARTER PACK
+                                </button>
+                              )}
+                              <PingIndicator />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -521,6 +615,26 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                         await applyReferralCode(playerData.uid, code);
                     }}
                 />
+            )}
+            {isRewardWheelOpen && (
+              <RewardWheel
+                onSpin={handleRewardWheelSpin}
+                freeSpinAvailable={freeSpinAvailable}
+                onClose={() => setIsRewardWheelOpen(false)}
+              />
+            )}
+            {isStarterPackOpen && (
+              <StarterPackModal
+                onPurchase={handleStarterPackPurchase}
+                onClose={() => setIsStarterPackOpen(false)}
+                price={50}
+              />
+            )}
+            {achievementToShow && (
+              <AchievementModal
+                achievement={achievementToShow}
+                onClose={() => setAchievementToShow(null)}
+              />
             )}
         </div>
     );

@@ -236,6 +236,14 @@ export interface Player {
   consecutiveLosses?: number;
   referral?: ReferralData;
   loginStreak?: LoginStreak;
+  totalMatches?: number;
+  totalWins?: number;
+  totalDamage?: number;
+  consecutiveWins?: number;
+  achievementPoints?: number;
+  lastFreeSpinDate?: string;
+  hasPurchasedStarterPack?: boolean;
+  unlockedAchievements?: string[];
 }
 
 export interface ClanMember {

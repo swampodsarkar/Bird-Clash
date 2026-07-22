@@ -225,6 +225,12 @@ export const findMatch = async (
   });
 };
 
+// Beginner Bot Protection: first 10 matches = bot match
+export const shouldUseBotProtection = (player: Player): boolean => {
+  const totalMatches = player.totalMatches || 0;
+  return totalMatches < 10;
+};
+
 export const createBotMatch = async (player: Player, selectedBird: Bird): Promise<Match> => {
     // 1. Determine Bot Difficulty
     const { tier } = getRankInfo(player.rankPoints);

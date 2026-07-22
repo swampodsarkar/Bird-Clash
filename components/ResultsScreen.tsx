@@ -18,6 +18,10 @@ import Button from './common/Button';
 import { useGameConfig } from '../hooks/useGameConfig';
 import { getRankInfo } from '../utils/helpers';
 import { ShareMatchModal } from './common/ShareMatchModal';
+import { updateMatchStats, checkAchievements } from '../services/achievementService';
+import type { Achievement } from '../services/achievementService';
+import AchievementModal from './common/AchievementModal';
+import TitleUnlockAnimation from './common/TitleUnlockAnimation';
 
 const AnimatedCounter: React.FC<{ target: number, duration?: number }> = ({ target, duration = 1000 }) => {
     const [count, setCount] = useState(0);
@@ -59,6 +63,9 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
   const [streakProtected, setStreakProtected] = useState(false);
   const [closeCallBonus, setCloseCallBonus] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [achievement, setAchievement] = useState<Achievement | null>(null);
+  const [mvaTitle, setMvaTitle] = useState<string | null>(null);
+  const [mvpTitle, setMvpTitle] = useState<string | null>(null);
 
   const { me, opponent } = useMemo(() => {
     if (match.player1.uid === currentUserId) {
@@ -66,6 +73,30 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
     }
     return { me: match.player2, opponent: match.player1 };
   }, [match, currentUserId]);
+
+  const mvpPlayer = useMemo(() => {
+    if (result.outcome === 'win') return me;
+    if (result.outcome === 'loss') return opponent;
+    return null;
+  }, [result, me, opponent]);
+
+  const mvpDamage = useMemo(() => {
+    if (result.outcome === 'win') return result.myDamageDealt;
+    if (result.outcome === 'loss') return result.opponentDamageDealt;
+    return 0;
+  }, [result]);
+
+  const mvaPlayer = useMemo(() => {
+    if (result.outcome === 'loss') return me;
+    if (result.outcome === 'win') return opponent;
+    return null;
+  }, [result, me, opponent]);
+
+  const mvaDamage = useMemo(() => {
+    if (result.outcome === 'loss') return result.myDamageDealt;
+    if (result.outcome === 'win') return result.opponentDamageDealt;
+    return 0;
+  }, [result]);
 
   useEffect(() => {
     const applyChanges = async () => {
@@ -137,6 +168,24 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
 
                 const xpForLevel = result.outcome === 'win' ? 200 : result.outcome === 'loss' ? 150 : 175;
                 await addPlayerXpAndLevelUp(currentUserId, xpForLevel);
+
+                // Achievement & Stats tracking
+                await updateMatchStats(currentUserId, result.outcome === 'win', result.myDamageDealt);
+                const newAchievements = await checkAchievements(currentUserId, playerData);
+                if (newAchievements.length > 0) {
+                    setAchievement(newAchievements[0]);
+                }
+
+                // MVP / MVA Titles
+                if (result.outcome !== 'draw') {
+                    const isWin = result.outcome === 'win';
+                    const winnerDamage = isWin ? result.myDamageDealt : result.opponentDamageDealt;
+                    const loserDamage = isWin ? result.opponentDamageDealt : result.myDamageDealt;
+                    if (winnerDamage >= loserDamage) {
+                        setMvpTitle(isWin ? me.displayName : opponent.displayName);
+                        setMvaTitle(isWin ? opponent.displayName : me.displayName);
+                    }
+                }
             }
         } catch (error) {
             console.error("Failed to update player stats after match:", error);
@@ -231,6 +280,29 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
     <div className="flex flex-col items-center justify-center min-h-screen text-center relative overflow-hidden p-4">
       {result.outcome === 'win' && <><Confetti /><VictoryAnimation type="victory" /></>}
       {result.outcome === 'loss' && <VictoryAnimation type="defeat" />}
+
+      {/* MVP / MVA Display */}
+      {result.outcome !== 'draw' && (
+        <div className="w-full max-w-md z-10 mb-2">
+          <div className="grid grid-cols-2 gap-2">
+            {mvpPlayer && (
+              <div className="bg-green-900/80 border-2 border-green-400 p-2 text-center">
+                <p className="text-[10px] text-green-300 font-bold">🏆 MVP</p>
+                <p className="text-xs text-white font-bold truncate">{mvpTitle || mvpPlayer.displayName}</p>
+                <p className="text-[10px] text-green-400">{mvpDamage} dmg</p>
+              </div>
+            )}
+            {mvaPlayer && (
+              <div className="bg-red-900/80 border-2 border-red-400 p-2 text-center">
+                <p className="text-[10px] text-red-300 font-bold">💪 MVA</p>
+                <p className="text-xs text-white font-bold truncate">{mvaTitle || mvaPlayer.displayName}</p>
+                <p className="text-[10px] text-red-400">{mvaDamage} dmg</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="p-6 sm:p-8 bg-[#2c2c54]/90 backdrop-blur-sm border-2 border-black shadow-[8px_8px_0px_#000000] w-full max-w-md z-10">
         <h1 className={`text-4xl sm:text-5xl font-bold mb-4 ${titleColor}`} style={{ textShadow: '2px 2px 0px #000' }}>{getTitle()}</h1>
         
@@ -298,6 +370,9 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
           myName={playerData.displayName || 'Player'}
           onClose={() => setShowShareModal(false)}
         />
+      )}
+      {achievement && (
+        <AchievementModal achievement={achievement} onClose={() => setAchievement(null)} />
       )}
     </div>
   );

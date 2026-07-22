@@ -7,7 +7,7 @@ import ResultsScreen from './components/ResultsScreen';
 import InviteNotificationModal from './components/common/InviteNotificationModal';
 import { Spinner } from './components/common/Spinner';
 import type { Match, Player, MatchResult, Invite, MatchPlayer, Bird, CustomRoom, RoomInvite } from './types';
-import { findMatch, cancelMatchmaking, createBotMatch } from './services/gameService';
+import { findMatch, cancelMatchmaking, createBotMatch, shouldUseBotProtection } from './services/gameService';
 import * as roomService from './services/roomService';
 import { listenToPlayer, updatePlayerCoins, completeTutorial } from './services/playerService';
 import { updateUserMatchStatus } from './services/friendService';
@@ -444,7 +444,7 @@ const Game: React.FC = () => {
     }
   }, [isUpdateRequired, patchVersion]);
   
-  // Handles matchmaking logic, including bot fallback
+  // Handles matchmaking logic, including bot fallback + beginner bot protection
   useEffect(() => {
     if (gameState === 'MATCHMAKING' && playerData && !foundMatchForVS) {
       const equippedBird = playerData.ownedBirds?.[playerData.equippedBirdId || ''] || Object.values(playerData.ownedBirds || {})[0];
@@ -467,22 +467,40 @@ const Game: React.FC = () => {
         setFoundMatchForVS(locatedMatch);
       };
 
-      // Set a 30-second timeout to find a bot match.
+      // Beginner Bot Protection: first 10 matches = immediate bot
+      const useBotProtection = shouldUseBotProtection(playerData);
+
+      if (useBotProtection) {
+        // Skip queue, go straight to bot
+        try {
+          createBotMatch(playerData, equippedBird).then(botMatch => {
+            handleOpponentLocated(botMatch);
+          }).catch(e => {
+            toast.error("Failed to create bot match. Please try again.");
+            setGameState('LOBBY');
+          });
+        } catch (e: any) {
+          toast.error("Failed to create bot match. Please try again.");
+          setGameState('LOBBY');
+        }
+        return cleanup;
+      }
+
+      // Set a 25-second timeout to find a bot match (reduced from 30).
       matchmakingTimeoutRef.current = window.setTimeout(async () => {
-        if (gameState !== 'MATCHMAKING' || foundMatchForVS) return; // Check if still matchmaking
+        if (gameState !== 'MATCHMAKING' || foundMatchForVS) return;
         cleanup();
-        cancelMatchmaking(playerData.uid, 'rank', 0); // Cancel the queue search
+        cancelMatchmaking(playerData.uid, 'rank', 0);
         try {
             const botMatch = await createBotMatch(playerData, equippedBird);
             handleOpponentLocated(botMatch);
         } catch (e: any) {
             toast.error("Failed to create a bot match. Please try again.");
-            if (fee > 0) await updatePlayerCoins(playerData.uid, fee); // Refund fee
+            if (fee > 0) await updatePlayerCoins(playerData.uid, fee);
             setGameState('LOBBY');
         }
-      }, 30000);
+      }, 25000);
 
-      // Start the search for a real player.
       findMatch(playerData, handleOpponentLocated, (error) => {
         cleanup();
         toast.error(error.message);
