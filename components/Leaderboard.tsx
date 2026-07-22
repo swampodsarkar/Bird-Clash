@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
-// Fix: Removed 'RankInfo' from import as it's not exported from '../types' and is not used.
+import React, { useState, useEffect, useRef } from 'react';
 import type { Player, Clan, RankTier } from '../types';
 import { rtdb } from '../services/firebase';
 import type firebase from 'firebase/compat/app';
@@ -9,7 +8,7 @@ import PlayerAvatar from './common/PlayerAvatar';
 import { getRankInfo } from '../utils/helpers';
 import { FALLBACK_BOT_NAMES } from '../constants';
 import { toast } from 'react-toastify';
-import { Trophy } from 'lucide-react';
+import { Trophy, Medal, Crown, Zap, Users, Clock, Bot } from 'lucide-react';
 
 type LeaderboardTab = 'players' | 'clans';
 type PlayerFilter = 'all-time' | 'weekly' | 'daily';
@@ -126,36 +125,71 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onViewProfile }) => {
   
   const renderPlayerList = () => {
     const orderBy = playerFilter === 'daily' ? 'dailyRankPoints' : playerFilter === 'weekly' ? 'weeklyRankPoints' : 'rankPoints';
+    const medalIcons = ['🥇', '🥈', '🥉'];
+    const rankColors = ['text-yellow-400', 'text-gray-300', 'text-amber-600'];
+    
+    if (topPlayers.length === 0) return <p className="text-center text-gray-400 py-8">No players found.</p>;
+
     return (
-        <ul className="space-y-1">
+        <div className="space-y-1">
         {topPlayers.map((player, index) => {
             const { rankName, tier } = getRankInfo(player.rankPoints);
             const score = (player[orderBy as keyof Player] as number) || 0;
+            const isBot = player.uid.startsWith('bot_');
+            const isTop3 = index < 3;
+            const lastActive = player.lastLogin ? Date.now() - player.lastLogin : Infinity;
+            const isOnline = !isBot && lastActive < 60000;
             return (
-                <li 
+                <div 
                     key={player.uid} 
-                    className="flex items-center justify-between p-1.5 bg-gray-900 border border-gray-700 text-xs transition-colors hover:bg-gray-800 cursor-pointer"
+                    className={`flex items-center justify-between p-2 text-xs transition-all duration-200 cursor-pointer border animate-slide-up
+                        ${isTop3 
+                            ? 'bg-gradient-to-r from-yellow-900/30 via-yellow-800/20 to-transparent border-yellow-600/30 hover:border-yellow-500/50' 
+                            : 'bg-gray-900/80 border-gray-700/50 hover:bg-gray-800 hover:border-gray-500'
+                        } ${index === 0 ? 'animate-pulse-glow' : ''}`}
                     onClick={() => onViewProfile(player.uid)}
+                    style={{ animationDelay: `${index * 30}ms` }}
                 >
-                <div className="flex items-center space-x-2">
-                    <span className={`font-bold text-xs w-6 text-center ${index < 3 ? 'text-yellow-400 text-sm' : 'text-gray-400'}`}>{index + 1}</span>
-                    <PlayerAvatar 
-                        photoURL={player.photoURL}
-                        uid={player.uid}
-                        activeBadge={player.activeBadge}
-                        sizeClassName="w-6 h-6"
-                        imgClassName="bg-gray-700 border border-black"
-                    />
-                    <span className="truncate max-w-[100px] sm:max-w-none">{player.displayName || 'Anonymous'}</span>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`flex items-center justify-center w-7 h-7 rounded-full font-bold text-xs flex-shrink-0
+                            ${isTop3 ? 'text-white' : 'text-gray-400'}`}
+                            style={isTop3 ? { background: `linear-gradient(135deg, ${['#FFD700', '#C0C0C0', '#CD7F32'][index]}, ${['#FFA500', '#A0A0A0', '#8B4513'][index]})` } : {}}
+                        >
+                            {index + 1}
+                        </div>
+                        <PlayerAvatar 
+                            photoURL={player.photoURL}
+                            uid={player.uid}
+                            activeBadge={player.activeBadge}
+                            sizeClassName="w-7 h-7"
+                            imgClassName="bg-gray-700 border border-black rounded-full"
+                            displayName={player.displayName}
+                        />
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1">
+                                <span className="font-bold truncate text-white text-xs">{player.displayName || 'Anonymous'}</span>
+                                {isBot && <Bot size={10} className="text-orange-400 flex-shrink-0" title="Bot" />}
+                                {isOnline && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse flex-shrink-0" title="Online"></span>}
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                <span>{tier.icon}</span>
+                                <span className="truncate">{rankName}</span>
+                                <span className="text-gray-600">•</span>
+                                <span>Lvl {player.level || 1}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <div className="text-right">
+                            <p className="font-bold text-blue-400 text-xs">{score.toLocaleString()}</p>
+                            <p className="text-[9px] text-gray-500">RP</p>
+                        </div>
+                        {isTop3 && <Medal size={16} className={rankColors[index]} />}
+                    </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                    <span className="text-base" title={rankName}>{tier.icon}</span>
-                    <span className="font-semibold text-blue-400 flex items-center gap-1"><Trophy size={12} /> {score.toLocaleString()} RP</span>
-                </div>
-                </li>
             );
         })}
-        </ul>
+        </div>
     );
   };
   
@@ -178,6 +212,18 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onViewProfile }) => {
 
   return (
     <div className="w-full h-full flex flex-col bg-[#2c2c54] border-2 border-black shadow-[4px_4px_0px_#000000]">
+      <style>{`
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 5px rgba(255,215,0,0.2); }
+          50% { box-shadow: 0 0 15px rgba(255,215,0,0.4); }
+        }
+        .animate-slide-up { animation: slide-up 0.3s ease-out both; }
+        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+      `}</style>
       {/* Tabs Header */}
       <div className="flex-shrink-0 border-b-2 border-black">
           <div className="flex">
