@@ -21,7 +21,7 @@ import MaintenanceScreen from './components/common/MaintenanceScreen';
 import BannedScreen from './components/common/BannedScreen';
 import { useGameConfig } from './hooks/useGameConfig';
 import { ContentConfigProvider, useContentConfig } from './hooks/useContentConfig';
-import { ADMIN_UID, BIRD_DEFINITIONS } from './constants';
+import { ADMIN_UID, ADMIN_EMAIL, BIRD_DEFINITIONS } from './constants';
 import AdminView from './components/admin/AdminView';
 import Dashboard from './components/Dashboard';
 import PostLoginLoadingScreen from './components/common/PostLoginLoadingScreen';
@@ -486,7 +486,7 @@ const Game: React.FC = () => {
         return cleanup;
       }
 
-      // Set a 25-second timeout to find a bot match (reduced from 30).
+      // Set a 30-second timeout — if no real player found, create rank-based bot match
       matchmakingTimeoutRef.current = window.setTimeout(async () => {
         if (gameState !== 'MATCHMAKING' || foundMatchForVS) return;
         cleanup();
@@ -499,7 +499,7 @@ const Game: React.FC = () => {
             if (fee > 0) await updatePlayerCoins(playerData.uid, fee);
             setGameState('LOBBY');
         }
-      }, 25000);
+      }, 30000);
 
       findMatch(playerData, handleOpponentLocated, (error) => {
         cleanup();
@@ -539,7 +539,7 @@ const Game: React.FC = () => {
 
   // One-time data migration for admin
   useEffect(() => {
-    if (user?.uid === ADMIN_UID && !isAdminExited) {
+    if (user?.email === ADMIN_EMAIL && !isAdminExited) {
       const runMigration = async () => {
         const migrationRef = rtdb.ref('migrations/removedApexCondor');
         const snapshot = await migrationRef.once('value');
@@ -758,7 +758,7 @@ const Game: React.FC = () => {
     </div>
   );
 
-  if (maintenanceMode && user?.uid !== ADMIN_UID) {
+  if (maintenanceMode && user?.email !== ADMIN_EMAIL) {
       return <MaintenanceScreen />;
   }
   
@@ -771,7 +771,7 @@ const Game: React.FC = () => {
   }
   
   // If the user is an admin and hasn't explicitly exited to the game view
-  if (user && user.uid === ADMIN_UID && !isAdminExited) {
+  if (user && user.email === ADMIN_EMAIL && !isAdminExited) {
     return (
         <div className="w-full">
             <AdminView onExit={() => setIsAdminExited(true)} />

@@ -62,6 +62,7 @@ export const RANK_TIERS: RankTier[] = [
 ];
 
 export const ADMIN_UID = 'mnFIIa37J2Tusva0efCp7M3tgE83'; // IMPORTANT: Replace with your actual Firebase Admin User UID
+export const ADMIN_EMAIL = 'adminsrs11@gmail.com'; // Admin login email
 export const CURRENT_ROYALE_PASS_SEASON = 'season_1';
 
 export const TOP_UP_PRODUCTS: TopUpProduct[] = [

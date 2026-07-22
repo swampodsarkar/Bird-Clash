@@ -4,7 +4,7 @@ import type { Match, MatchResult, MatchPlayer, Player } from '../types';
 import { rtdb } from '../services/firebase';
 import * as playerService from '../services/playerService';
 import * as gameService from '../services/gameService';
-import type firebase from 'firebase/compat/app';
+import firebase from 'firebase/compat/app';
 import Button from './common/Button';
 import { getRankInfo } from '../utils/helpers';
 import { Spinner } from './common/Spinner';
@@ -237,6 +237,45 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   }, [me]);
 
   const isOpponentBot = useMemo(() => opponent?.isBot === true, [opponent]);
+
+  // --- Auto-forfeit on opponent disconnect ---
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'active' || isOpponentBot) return;
+    if (!opponent?.uid) return;
+
+    const myDisconnectRef = rtdb.ref(`matches/${match.id}/disconnections/${currentUserId}`);
+    const allDisconnectsRef = rtdb.ref(`matches/${match.id}/disconnections`);
+
+    // Set onDisconnect: marks me as disconnected
+    myDisconnectRef.onDisconnect().set({
+      disconnectedAt: firebase.database.ServerValue.TIMESTAMP,
+      uid: currentUserId,
+    }).then(() => {
+      myDisconnectRef.set(null); // Clear current
+    });
+
+    // Watch opponent's disconnect status
+    const opponentDisconnectRef = rtdb.ref(`matches/${match.id}/disconnections/${opponent.uid}`);
+    const listener = (snap: firebase.database.DataSnapshot) => {
+      if (!snap.exists()) return;
+      const data = snap.val();
+      if (!data || !data.disconnectedAt) return;
+      const elapsed = Date.now() - data.disconnectedAt;
+      const timeSinceDisconnect = elapsed > 15000; // 15 second grace period
+      if (timeSinceDisconnect) {
+        // Opponent disconnected and is gone — auto-win
+        gameService.forfeitMatch(match.id, opponent.uid).catch(() => {});
+      }
+    };
+    opponentDisconnectRef.on('value', listener);
+
+    return () => {
+      myDisconnectRef.onDisconnect().cancel();
+      myDisconnectRef.remove().catch(() => {});
+      opponentDisconnectRef.off('value', listener);
+      allDisconnectsRef.remove().catch(() => {});
+    };
+  }, [gameState?.id, gameState?.status, opponent?.uid, currentUserId, match.id, isOpponentBot]);
 
   // Turn Timer Logic
   useEffect(() => {

@@ -22,6 +22,8 @@ import { updateMatchStats, checkAchievements } from '../services/achievementServ
 import type { Achievement } from '../services/achievementService';
 import AchievementModal from './common/AchievementModal';
 import TitleUnlockAnimation from './common/TitleUnlockAnimation';
+import LevelUpModal from './common/LevelUpModal';
+import type { LevelUpResult } from '../services/playerService';
 
 const AnimatedCounter: React.FC<{ target: number, duration?: number }> = ({ target, duration = 1000 }) => {
     const [count, setCount] = useState(0);
@@ -66,6 +68,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
   const [achievement, setAchievement] = useState<Achievement | null>(null);
   const [mvaTitle, setMvaTitle] = useState<string | null>(null);
   const [mvpTitle, setMvpTitle] = useState<string | null>(null);
+  const [levelUp, setLevelUp] = useState<LevelUpResult | null>(null);
 
   const { me, opponent } = useMemo(() => {
     if (match.player1.uid === currentUserId) {
@@ -166,8 +169,9 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
                 const xpGained = result.outcome === 'win' ? 25 : 10;
                 await addRoyalePassXp(currentUserId, xpGained);
 
-                const xpForLevel = result.outcome === 'win' ? 200 : result.outcome === 'loss' ? 150 : 175;
-                await addPlayerXpAndLevelUp(currentUserId, xpForLevel);
+                const xpForLevel = result.outcome === 'win' ? 200 : result.outcome === 'loss' ? 100 : 150;
+                const lvlUpResult = await addPlayerXpAndLevelUp(currentUserId, xpForLevel);
+                if (lvlUpResult?.leveledUp) setLevelUp(lvlUpResult);
 
                 // Achievement & Stats tracking
                 await updateMatchStats(currentUserId, result.outcome === 'win', result.myDamageDealt);
@@ -373,6 +377,13 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
       )}
       {achievement && (
         <AchievementModal achievement={achievement} onClose={() => setAchievement(null)} />
+      )}
+      {levelUp && (
+        <LevelUpModal
+          newLevel={levelUp.newLevel}
+          rewards={levelUp.rewards}
+          onClose={() => setLevelUp(null)}
+        />
       )}
     </div>
   );
