@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Player, Clan, RankTier } from '../types';
 import { rtdb } from '../services/firebase';
 import type firebase from 'firebase/compat/app';
@@ -8,7 +8,7 @@ import PlayerAvatar from './common/PlayerAvatar';
 import { getRankInfo } from '../utils/helpers';
 import { FALLBACK_BOT_NAMES } from '../constants';
 import { toast } from 'react-toastify';
-import { Trophy, Medal, Crown, Zap, Users, Clock, Bot } from 'lucide-react';
+import { Trophy, Medal } from 'lucide-react';
 
 type LeaderboardTab = 'players' | 'clans';
 type PlayerFilter = 'all-time' | 'weekly' | 'daily';
@@ -135,10 +135,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onViewProfile }) => {
         {topPlayers.map((player, index) => {
             const { rankName, tier } = getRankInfo(player.rankPoints);
             const score = (player[orderBy as keyof Player] as number) || 0;
-            const isBot = player.uid.startsWith('bot_');
             const isTop3 = index < 3;
             const lastActive = player.lastLogin ? Date.now() - player.lastLogin : Infinity;
-            const isOnline = !isBot && lastActive < 60000;
+            const isOnline = player.lastLogin ? lastActive < 60000 : false;
             return (
                 <div 
                     key={player.uid} 
@@ -168,7 +167,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onViewProfile }) => {
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1">
                                 <span className="font-bold truncate text-white text-xs">{player.displayName || 'Anonymous'}</span>
-                                {isBot && <Bot size={10} className="text-orange-400 flex-shrink-0" title="Bot" />}
                                 {isOnline && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse flex-shrink-0" title="Online"></span>}
                             </div>
                             <div className="flex items-center gap-1 text-[10px] text-gray-500">

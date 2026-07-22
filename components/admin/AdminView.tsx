@@ -81,6 +81,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onExit }) => {
                     <NavItem label="Reports" />
                     <NavItem label="Bird Images" />
                     <NavItem label="Backgrounds" />
+                    <NavItem label="Events" />
                 </nav>
                 <div>
                     {renderContent()}
