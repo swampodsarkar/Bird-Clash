@@ -121,9 +121,8 @@ export interface PlayerQuestProgress {
 export interface DynamicDuo {
   partnerUid: string;
   partnerDisplayName: string;
-  // Fix: Add 'pending_received' to correctly model duo request states.
   status: 'pending_sent' | 'pending_received' | 'active';
-  since: number; // timestamp for when duo became active
+  since: number;
 }
 
 export interface ReferralData {
