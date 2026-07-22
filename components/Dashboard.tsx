@@ -31,11 +31,11 @@ import { toast } from 'react-toastify';
 import MembershipClaimModal from './common/MembershipClaimModal';
 import firebase from 'firebase/compat/app';
 import { DAILY_QUESTS, BIRD_DEFINITIONS } from '../constants';
-import PlayerRankDisplay from './common/PlayerRankDisplay';
+
 import SeasonalEventModal from './common/SeasonalEventModal';
 import { useSettings } from '../hooks/useSettings';
 import EventsModal from './common/EventsModal';
-import { isWinterThemeActive } from '../utils/helpers';
+import { isWinterThemeActive, getRankInfo } from '../utils/helpers';
 import { useContentConfig } from '../hooks/useContentConfig';
 import Snowfall from './common/Snowfall';
 import CustomRoomModal from './common/CustomRoomModal';
@@ -340,19 +340,22 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             {/* Header - Clean HUD */}
             <header className="px-2 py-1.5 flex-shrink-0 flex items-center justify-between gap-2 bg-gradient-to-r from-black/60 via-black/40 to-black/60 backdrop-blur-md border-b border-white/10 z-10 shadow-lg">
                 {/* Left: Player Info */}
-                <div className="flex items-center gap-2 min-w-0">
-                    <button onClick={() => setActiveTab('PROFILE')} className="flex items-center gap-2 text-left hover:scale-105 transition-transform duration-200 flex-shrink-0">
-                        <PlayerAvatar photoURL={playerData.photoURL} uid={playerData.uid} activeBadge={playerData.activeBadge} sizeClassName="w-9 h-9 md:w-10 md:h-10" imgClassName="border-2 border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.4)] rounded-lg"/>
-                        <div className="min-w-0">
-                            <h2 className="text-xs md:text-sm font-bold font-pixel text-white drop-shadow-md truncate max-w-[80px] sm:max-w-[150px]">{playerData.displayName || 'Player'}</h2>
-                            <div className="w-16 h-2.5 bg-gray-900 border border-gray-600 rounded-full mt-0.5 relative overflow-hidden">
+                <div className="flex items-center gap-1.5">
+                    <button onClick={() => setActiveTab('PROFILE')} className="flex items-center gap-1.5 text-left hover:scale-105 transition-transform duration-200 flex-shrink-0 group">
+                        <PlayerAvatar photoURL={playerData.photoURL} uid={playerData.uid} activeBadge={playerData.activeBadge} sizeClassName="w-8 h-8 md:w-10 md:h-10" imgClassName="border-2 border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.4)] rounded-lg"/>
+                        <div className="hidden sm:block min-w-0">
+                            <h2 className="text-xs font-bold font-pixel text-white drop-shadow-md truncate max-w-[120px]">{playerData.displayName || 'Player'}</h2>
+                            <div className="w-14 h-2 bg-gray-900 border border-gray-600 rounded-full mt-0.5 relative overflow-hidden">
                                 <div className="h-full bg-gradient-to-r from-yellow-500 to-yellow-300 rounded-full" style={{ width: `${((playerData.xp || 0) / (playerData.xpToNextLevel || 100)) * 100}%` }}></div>
-                                <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-white drop-shadow-md">LVL {playerData.level || 1}</span>
+                                <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-white drop-shadow-md">{playerData.level || 1}</span>
                             </div>
                         </div>
                     </button>
                     {primeLevel > 0 && <PrimeLevelDisplay level={primeLevel} />}
-                    <PlayerRankDisplay player={playerData} className="scale-90" />
+                    <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1">
+                        <span className="text-lg">{getRankInfo(playerData.rankPoints).tier.icon}</span>
+                        <span className="text-[10px] font-bold text-white font-pixel whitespace-nowrap">{getRankInfo(playerData.rankPoints).rankName}</span>
+                    </div>
                 </div>
 
                 {/* Right: Currency + Actions */}
