@@ -411,6 +411,45 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         const meKey = currentData.player1.uid === currentUserId ? 'player1' : 'player2';
         const opponentKey = meKey === 'player1' ? 'player2' : 'player1';
 
+        // --- Process Burn (tick at turn start) ---
+        [meKey, opponentKey].forEach(key => {
+            const burn = currentData[key].activeEffects?.burn;
+            if (burn) {
+                currentData[key].currentHealth -= burn.damage;
+                currentData.log.push(`${currentData[key].displayName} takes ${burn.damage} burn damage!`);
+                burn.turns -= 1;
+                if (burn.turns <= 0) delete currentData[key].activeEffects.burn;
+            }
+        });
+
+        // --- Burn kill check ---
+        if (currentData[opponentKey].currentHealth <= 0) {
+            currentData.winner = currentUserId;
+            currentData.status = 'finished';
+            currentData.log.push(`${currentData[meKey].displayName} wins by burn!`);
+            return currentData;
+        }
+        if (currentData[meKey].currentHealth <= 0) {
+            currentData.winner = currentData[opponentKey].uid;
+            currentData.status = 'finished';
+            currentData.log.push(`${currentData[opponentKey].displayName} wins by burn!`);
+            return currentData;
+        }
+
+        // --- Check if attacker is STUNNED ---
+        if (currentData[meKey].activeEffects?.stunned) {
+            delete currentData[meKey].activeEffects.stunned;
+            currentData.log.push(`${currentData[meKey].displayName} is stunned and misses a turn!`);
+            // Still pass turn with no attack
+            if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
+                currentData[meKey].ultimateCooldownLeft -= 1;
+            }
+            currentData.turn += 1;
+            currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
+            currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+            return currentData;
+        }
+
         let damage = currentData[meKey].selectedBird.skillPower;
 
         // --- Block Defense Check ---
@@ -439,6 +478,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             delete currentData[opponentKey].activeEffects.defenseBuff;
         }
 
+        // Shield absorbs damage first
+        if (currentData[opponentKey].activeEffects?.shield) {
+            const shieldHp = currentData[opponentKey].activeEffects.shield;
+            if (damage <= shieldHp) {
+                currentData[opponentKey].activeEffects.shield -= damage;
+                damage = 0;
+                currentData.log.push(`${currentData[opponentKey].displayName}'s shield absorbed the attack!`);
+            } else {
+                damage -= shieldHp;
+                delete currentData[opponentKey].activeEffects.shield;
+                currentData.log.push(`${currentData[opponentKey].displayName}'s shield shattered!`);
+            }
+        }
+
         currentData[opponentKey].currentHealth -= damage;
         currentData[meKey].damageDealt += damage;
 
@@ -447,6 +500,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
         if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
             currentData[meKey].ultimateCooldownLeft -= 1;
+        }
+
+        if (currentData[meKey].abilityCooldownLeft && currentData[meKey].abilityCooldownLeft > 0) {
+            currentData[meKey].abilityCooldownLeft -= 1;
         }
 
         if (currentData[opponentKey].currentHealth <= 0) {
@@ -588,6 +645,67 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         };
         return currentData;
     }).catch(error => toast.error("Ultimate failed."))
+      .finally(() => setIsSubmitting(false));
+  }, [isMyTurn, isSubmitting, currentUserId, match.id, me]);
+
+  const handleAbility = useCallback(() => {
+    if (!isMyTurn || isSubmitting) return;
+    soundManager.play('button_click');
+
+    const birdDef = me?.selectedBird;
+    if (!birdDef || !birdDef.abilityType) return;
+
+    setIsSubmitting(true);
+    const matchRef = rtdb.ref(`matches/${match.id}`);
+    matchRef.transaction(currentData => {
+        if (!currentData || currentData.status !== 'active' || currentData.currentTurnPlayerUid !== currentUserId) return;
+        const meKey = currentData.player1.uid === currentUserId ? 'player1' : 'player2';
+        const opponentKey = meKey === 'player1' ? 'player2' : 'player1';
+
+        if (!currentData.log) currentData.log = [];
+
+        const abilityType = currentData[meKey].selectedBird.abilityType;
+        const abilityValue = currentData[meKey].selectedBird.abilityValue || 0;
+
+        if (abilityType === 'SHIELD') {
+            if (!currentData[meKey].activeEffects) currentData[meKey].activeEffects = {};
+            currentData[meKey].activeEffects.shield = abilityValue;
+            currentData.log.push(`${currentData[meKey].displayName} uses ${currentData[meKey].selectedBird.abilityDescription}`);
+        } else if (abilityType === 'DEFENSE_BUFF') {
+            if (!currentData[meKey].activeEffects) currentData[meKey].activeEffects = {};
+            currentData[meKey].activeEffects.defenseBuff = true;
+            currentData.log.push(`${currentData[meKey].displayName} uses ${currentData[meKey].selectedBird.abilityDescription}`);
+        } else if (abilityType === 'BURN') {
+            if (!currentData[opponentKey].activeEffects) currentData[opponentKey].activeEffects = {};
+            currentData[opponentKey].activeEffects.burn = { turns: 2, damage: abilityValue };
+            currentData.log.push(`${currentData[meKey].displayName} uses ${currentData[meKey].selectedBird.abilityDescription}`);
+        } else if (abilityType === 'STUN_CHANCE') {
+            const stunned = Math.random() < (abilityValue / 100);
+            if (stunned) {
+                if (!currentData[opponentKey].activeEffects) currentData[opponentKey].activeEffects = {};
+                currentData[opponentKey].activeEffects.stunned = true;
+                currentData.log.push(`${currentData[meKey].displayName} stuns ${currentData[opponentKey].displayName}!`);
+            } else {
+                currentData.log.push(`${currentData[meKey].displayName}'s stun attempt failed.`);
+            }
+        }
+
+        // Start ability cooldown
+        const abilityCd = currentData[meKey].selectedBird.abilityCooldown ?? 4;
+        currentData[meKey].abilityCooldownLeft = abilityCd;
+
+        if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
+            currentData[meKey].ultimateCooldownLeft -= 1;
+        }
+
+        currentData.turn += 1;
+        currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
+        currentData.turnTimer = {
+            currentTurnStartTime: Date.now(),
+            turnDuration: 30,
+        };
+        return currentData;
+    }).catch(error => toast.error("Ability failed."))
       .finally(() => setIsSubmitting(false));
   }, [isMyTurn, isSubmitting, currentUserId, match.id, me]);
 
@@ -826,12 +944,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           </div>
         </div>
       )}
-      {gameState.isNormalized && (
-          <div className="absolute top-0 left-0 right-0 bg-yellow-600 text-black text-center text-xs font-bold py-1 z-40">
-              ⚖️ FAIR MATCH - STATS NORMALIZED
-          </div>
-      )}
-
       {/* Ping indicator - top right corner */}
       <div className="absolute top-1 right-1 z-50">
         <PingIndicator />
@@ -921,65 +1033,80 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
       <div className="flex flex-col landscape:w-1/4 landscape:h-full p-1 sm:p-2">
         <PlayerDisplay player={me} isTurn={isMyTurn && isGameActive} movesLeft={myMovesLeft} isP1={isP1} />
 
-        {/* Action Buttons - Landscape: below my panel */}
-        <div className="mt-1 sm:mt-2 flex flex-col gap-1 sm:gap-2">
-          <div className="grid grid-cols-2 gap-1 sm:gap-2">
-            {me.selectedBird.ultimateType && (
-              <Button
-                onClick={handleUltimate}
-                disabled={!isMyTurn || isSubmitting || (me.ultimateCooldownLeft ?? 0) > 0}
-                className="!py-1 sm:!py-2 !text-sm sm:!text-base flex flex-col items-center justify-center bg-purple-600 hover:bg-purple-700 !min-h-0"
-              >
-                {isSubmitting ? <Spinner /> : (
-                  <>
-                    <span>ULTIMATE</span>
-                    <span className="text-[9px] sm:text-xs text-purple-200">
-                      {(me.ultimateCooldownLeft ?? 0) > 0 ? `CD: ${me.ultimateCooldownLeft}` : `~${me.selectedBird.ultimateValue || 0}dmg`}
-                    </span>
-                  </>
-                )}
-              </Button>
+        {/* Action Buttons */}
+        <div className="mt-1 sm:mt-2 flex flex-col gap-1.5">
+          {/* Row 1: Attack (main) */}
+          <button
+            onClick={handleAttack}
+            disabled={!isMyTurn || isSubmitting}
+            className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-red-600 to-orange-600 border-2 border-red-400 rounded-lg font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-[0_4px_0_#991b1b] active:translate-y-1 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_4px_0_#991b1b] hover:from-red-500 hover:to-orange-500"
+          >
+            {isSubmitting ? <Spinner /> : (
+              <><span className="text-lg">⚔️</span> ATTACK <span className="text-yellow-300 text-xs">~{potentialDamage}</span></>
             )}
-            <Button
+          </button>
+
+          {/* Row 2: Ability + Block + Ultimate */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {/* Bird Special Ability */}
+            {me.selectedBird.abilityType && (
+              <button
+                onClick={handleAbility}
+                disabled={!isMyTurn || isSubmitting || (me.abilityCooldownLeft ?? 0) > 0}
+                className="py-2 bg-gradient-to-br from-green-600 to-emerald-700 border-2 border-green-400 rounded-lg font-bold text-[10px] sm:text-xs flex flex-col items-center justify-center gap-0.5 shadow-[0_3px_0_#166534] active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_3px_0_#166534] hover:from-green-500 hover:to-emerald-600"
+              >
+                <span className="text-sm">✨</span>
+                <span>ABILITY</span>
+                <span className="text-green-300 text-[8px]">
+                  {(me.abilityCooldownLeft ?? 0) > 0 ? `CD:${me.abilityCooldownLeft}` : (me.selectedBird.abilityDescription?.split(':')[0] || '')}
+                </span>
+              </button>
+            )}
+
+            {/* Block */}
+            <button
               onClick={handleBlock}
               disabled={!isMyTurn || isSubmitting}
-              className="!py-1 sm:!py-2 !text-sm sm:!text-base flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700 !min-h-0"
+              className="py-2 bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-blue-400 rounded-lg font-bold text-[10px] sm:text-xs flex flex-col items-center justify-center gap-0.5 shadow-[0_3px_0_#1e40af] active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_3px_0_#1e40af] hover:from-blue-500 hover:to-indigo-600"
             >
-              {isSubmitting ? <Spinner /> : (
-                <>
-                  <span>🛡 BLOCK</span>
-                  <span className="text-[9px] sm:text-xs text-blue-200">-70% dmg</span>
-                </>
-              )}
-            </Button>
+              <span className="text-sm">🛡</span>
+              <span>BLOCK</span>
+              <span className="text-blue-300 text-[8px]">-70%</span>
+            </button>
+
+            {/* Ultimate */}
+            {me.selectedBird.ultimateType && (
+              <button
+                onClick={handleUltimate}
+                disabled={!isMyTurn || isSubmitting || (me.ultimateCooldownLeft ?? 0) > 0}
+                className="py-2 bg-gradient-to-br from-purple-600 to-pink-700 border-2 border-purple-400 rounded-lg font-bold text-[10px] sm:text-xs flex flex-col items-center justify-center gap-0.5 shadow-[0_3px_0_#6b21a8] active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_3px_0_#6b21a8] hover:from-purple-500 hover:to-pink-600"
+              >
+                <span className="text-sm">💥</span>
+                <span>ULTIMATE</span>
+                <span className="text-purple-300 text-[8px]">
+                  {(me.ultimateCooldownLeft ?? 0) > 0 ? `CD:${me.ultimateCooldownLeft}` : `~${me.selectedBird.ultimateValue || 0}`}
+                </span>
+              </button>
+            )}
           </div>
 
-          <Button onClick={handleAttack} disabled={!isMyTurn || isSubmitting} className="w-full !py-2 sm:!py-3 !text-lg sm:!text-xl flex items-center justify-center gap-2">
-            {isSubmitting ? <Spinner /> : (
-              <>
-                <span>⚔️ ATTACK</span>
-                <span className="text-xs sm:text-sm text-yellow-200">~{potentialDamage}</span>
-              </>
-            )}
-          </Button>
-
-          {/* Potions & Utility Row */}
-          <div className="flex gap-1 sm:gap-2 items-center">
+          {/* Row 3: Potions + Utility */}
+          <div className="flex gap-1 items-center">
             {me.potions && (Object.entries(me.potions) as [string, number][]).filter(([, count]) => count > 0).map(([potionId, count]) => (
               <button
                 key={potionId}
                 onClick={() => handleUsePotion(potionId)}
                 disabled={!isMyTurn || isSubmitting}
-                className="flex-1 h-10 sm:h-12 bg-blue-900/80 border-2 border-black text-sm flex flex-col items-center justify-center disabled:opacity-40 rounded hover:bg-blue-800 transition-colors"
+                className="flex-1 h-9 sm:h-10 bg-gradient-to-r from-teal-700 to-cyan-800 border-2 border-teal-400 text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 rounded-lg disabled:opacity-40 hover:from-teal-600 hover:to-cyan-700 transition-all active:scale-95"
                 title={`Use potion (ends turn)`}
               >
-                <span className="text-lg sm:text-xl">🧪</span>
-                <span className="text-[9px] sm:text-xs font-bold">{count}</span>
+                <span>🧪</span>
+                <span>{count}</span>
               </button>
             ))}
-            <button onClick={() => setIsEmotePanelOpen(prev => !prev)} className="h-10 sm:h-12 w-10 sm:w-12 bg-gray-800 border-2 border-black text-xl sm:text-2xl rounded hover:bg-gray-700 transition-colors">😊</button>
-            <button onClick={() => setShowForfeitConfirm(true)} className="h-10 sm:h-12 w-10 sm:w-12 bg-red-900/80 border-2 border-black text-sm rounded hover:bg-red-800 transition-colors" title="Forfeit">🏳️</button>
-            <button onClick={() => setIsSettingsOpen(true)} className="h-10 sm:h-12 w-10 sm:w-12 bg-gray-800 border-2 border-black text-xl sm:text-2xl rounded hover:bg-gray-700 transition-colors">⚙️</button>
+            <button onClick={() => setIsEmotePanelOpen(prev => !prev)} className="h-9 sm:h-10 w-9 sm:w-10 bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-gray-500 text-lg rounded-lg hover:from-gray-600 hover:to-gray-800 transition-all active:scale-95">😊</button>
+            <button onClick={() => setShowForfeitConfirm(true)} className="h-9 sm:h-10 w-9 sm:w-10 bg-gradient-to-br from-red-800 to-red-950 border-2 border-red-500 text-sm rounded-lg hover:from-red-700 hover:to-red-900 transition-all active:scale-95" title="Forfeit">🏳️</button>
+            <button onClick={() => setIsSettingsOpen(true)} className="h-9 sm:h-10 w-9 sm:w-10 bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-gray-500 text-lg rounded-lg hover:from-gray-600 hover:to-gray-800 transition-all active:scale-95">⚙️</button>
           </div>
         </div>
       </div>
