@@ -273,6 +273,13 @@ export interface Clan {
     } };
 }
 
+export interface RoundResult {
+  roundNumber: number;
+  winner: string | null;
+  player1Health: number;
+  player2Health: number;
+}
+
 export interface MatchPlayer {
     uid: string;
     displayName: string | null;
@@ -292,6 +299,7 @@ export interface MatchPlayer {
     potions?: { [potionId: string]: number };
     activeEffects?: ActiveEffects;
     healUsesLeft?: number;
+    wins?: number;
 }
 
 export interface TurnTimer {
@@ -325,6 +333,8 @@ export interface Match {
         battleIndex: number;
     };
     turn: number;
+    currentRound: number;
+    rounds: RoundResult[];
     currentTurnPlayerUid: string;
     turnOrder?: string[];
     defeatedUids?: string[];

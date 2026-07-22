@@ -126,8 +126,8 @@ export const startMatch = async (room: CustomRoom): Promise<void> => {
     const matchId = `match_custom_${room.id}`;
     const newMatch: Match = {
         id: matchId,
-        player1: { uid: hostPlayer.uid, displayName: hostPlayer.displayName, photoURL: hostPlayer.photoURL, damageDealt: 0, rankPoints: hostPlayer.rankPoints, clanId: hostPlayer.clanId, selectedBird: hostBird, currentHealth: hostBird.maxHealth, activeBadge: hostPlayer.activeBadge, equippedEmotes: hostPlayer.equippedEmotes, abilityCooldownLeft: 0, abilityUsesLeft: 2, activeEffects: {}, healUsesLeft: 2 },
-        player2: { uid: guestPlayer.uid, displayName: guestPlayer.displayName, photoURL: guestPlayer.photoURL, damageDealt: 0, rankPoints: guestPlayer.rankPoints, clanId: guestPlayer.clanId, selectedBird: guestBird, currentHealth: guestBird.maxHealth, activeBadge: guestPlayer.activeBadge, equippedEmotes: guestPlayer.equippedEmotes, abilityCooldownLeft: 0, abilityUsesLeft: 2, activeEffects: {}, healUsesLeft: 2 },
+        player1: { uid: hostPlayer.uid, displayName: hostPlayer.displayName, photoURL: hostPlayer.photoURL, damageDealt: 0, rankPoints: hostPlayer.rankPoints, clanId: hostPlayer.clanId, selectedBird: hostBird, currentHealth: hostBird.maxHealth, activeBadge: hostPlayer.activeBadge, equippedEmotes: hostPlayer.equippedEmotes, abilityCooldownLeft: 0, abilityUsesLeft: 2, wins: 0, activeEffects: {}, healUsesLeft: 2 },
+        player2: { uid: guestPlayer.uid, displayName: guestPlayer.displayName, photoURL: guestPlayer.photoURL, damageDealt: 0, rankPoints: guestPlayer.rankPoints, clanId: guestPlayer.clanId, selectedBird: guestBird, currentHealth: guestBird.maxHealth, activeBadge: guestPlayer.activeBadge, equippedEmotes: guestPlayer.equippedEmotes, abilityCooldownLeft: 0, abilityUsesLeft: 2, wins: 0, activeEffects: {}, healUsesLeft: 2 },
         status: 'active',
         winner: null,
         createdAt: Date.now(),
@@ -135,6 +135,8 @@ export const startMatch = async (room: CustomRoom): Promise<void> => {
         // Fix: Map the room type 'normal' to the match type 'classic' to resolve type incompatibility.
         matchType: room.roomType === 'normal' ? 'classic' : room.roomType,
         turn: 1,
+        currentRound: 1,
+        rounds: [],
         currentTurnPlayerUid: hostPlayer.uid,
         log: [],
     };

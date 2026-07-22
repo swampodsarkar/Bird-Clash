@@ -138,6 +138,53 @@ const ReactionAnimation: React.FC<{ payload: { reaction: string; targetPlayerUid
 
 const CONFIRM_FORFEIT_KEY = 'ff-forfeit-confirm';
 
+const ROUNDS_TO_WIN = 2;
+const MAX_TURNS_PER_ROUND = 10;
+
+const processRoundEnd = (data: any, winnerKey: string, loserKey: string, winnerUid: string) => {
+  if (!data.rounds) data.rounds = [];
+  data.rounds.push({
+    roundNumber: data.currentRound || 1,
+    winner: winnerUid,
+    player1Health: Math.max(0, data.player1.currentHealth),
+    player2Health: Math.max(0, data.player2.currentHealth),
+  });
+
+  data[winnerKey].wins = (data[winnerKey].wins || 0) + 1;
+
+  if (!data.log) data.log = [];
+  data.log.push(`${data[winnerKey].displayName} wins Round ${data.currentRound}!`);
+
+  if (data[winnerKey].wins >= ROUNDS_TO_WIN) {
+    data.winner = winnerUid;
+    data.status = 'finished';
+    data.log.push(`${data[winnerKey].displayName} wins the match ${data[winnerKey].wins}-${data[loserKey].wins || 0}!`);
+    return data;
+  }
+
+  data.currentRound = (data.currentRound || 1) + 1;
+
+  data.player1.currentHealth = data.player1.selectedBird.maxHealth;
+  data.player2.currentHealth = data.player2.selectedBird.maxHealth;
+
+  data.player1.activeEffects = {};
+  data.player2.activeEffects = {};
+
+  data.turn = 1;
+
+  data.currentTurnPlayerUid = data[loserKey].uid;
+
+  data.turnTimer = {
+    currentTurnStartTime: Date.now(),
+    turnDuration: 30,
+  };
+
+  data.log.push(`--- Round ${data.currentRound} ---`);
+  data.log.push(`${data[loserKey].displayName} starts Round ${data.currentRound}.`);
+
+  return data;
+};
+
 const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOver }) => {
   const currentUserId = currentPlayer.uid;
   const [gameState, setGameState] = useState<Match>(match);
@@ -481,18 +528,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             }
         });
 
-        // --- Burn kill check ---
+        // --- Burn kill check (round end) ---
         if (currentData[opponentKey].currentHealth <= 0) {
-            currentData.winner = currentUserId;
-            currentData.status = 'finished';
-            currentData.log.push(`${currentData[meKey].displayName} wins by burn!`);
-            return currentData;
+            return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
         }
         if (currentData[meKey].currentHealth <= 0) {
-            currentData.winner = currentData[opponentKey].uid;
-            currentData.status = 'finished';
-            currentData.log.push(`${currentData[opponentKey].displayName} wins by burn!`);
-            return currentData;
+            return processRoundEnd(currentData, opponentKey, meKey, currentData[opponentKey].uid);
         }
 
         // --- Check if attacker is STUNNED ---
@@ -569,20 +610,29 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         }
 
         if (currentData[opponentKey].currentHealth <= 0) {
-            currentData.winner = currentUserId;
-            currentData.status = 'finished';
-            currentData.log.push(`${currentData[meKey].displayName} wins!`);
-            return currentData;
+            return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
         }
-        if (currentData.turn >= 10) {
-            currentData.status = 'finished';
+        if (currentData.turn >= MAX_TURNS_PER_ROUND) {
             const p1Health = currentData.player1.currentHealth;
             const p2Health = currentData.player2.currentHealth;
-            if (p1Health > p2Health) currentData.winner = currentData.player1.uid;
-            else if (p2Health > p1Health) currentData.winner = currentData.player2.uid;
-            else currentData.winner = 'draw';
-            currentData.log.push("Time's up! Winner by health.");
-            return currentData;
+            if (p1Health > p2Health) {
+                return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
+            } else if (p2Health > p1Health) {
+                return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
+            } else {
+                if (!currentData.log) currentData.log = [];
+                currentData.log.push("Round draw! Starting next round...");
+                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+                currentData.player1.activeEffects = {};
+                currentData.player2.activeEffects = {};
+                currentData.turn = 1;
+                currentData.currentRound = (currentData.currentRound || 1) + 1;
+                currentData.currentTurnPlayerUid = currentData.player1.uid;
+                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+                return currentData;
+            }
         }
         currentData.turn += 1;
         const nextUid = currentData[opponentKey].uid;
@@ -685,20 +735,29 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         currentData[meKey].ultimateCooldownLeft = currentData[meKey].selectedBird.ultimateCooldown;
 
         if (currentData[opponentKey].currentHealth <= 0) {
-            currentData.winner = currentUserId;
-            currentData.status = 'finished';
-            currentData.log.push(`${currentData[meKey].displayName} wins!`);
-            return currentData;
+            return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
         }
-        if (currentData.turn >= 10) {
-            currentData.status = 'finished';
+        if (currentData.turn >= MAX_TURNS_PER_ROUND) {
             const p1Health = currentData.player1.currentHealth;
             const p2Health = currentData.player2.currentHealth;
-            if (p1Health > p2Health) currentData.winner = currentData.player1.uid;
-            else if (p2Health > p1Health) currentData.winner = currentData.player2.uid;
-            else currentData.winner = 'draw';
-            currentData.log.push("Time's up! Winner by health.");
-            return currentData;
+            if (p1Health > p2Health) {
+                return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
+            } else if (p2Health > p1Health) {
+                return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
+            } else {
+                if (!currentData.log) currentData.log = [];
+                currentData.log.push("Round draw! Starting next round...");
+                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+                currentData.player1.activeEffects = {};
+                currentData.player2.activeEffects = {};
+                currentData.turn = 1;
+                currentData.currentRound = (currentData.currentRound || 1) + 1;
+                currentData.currentTurnPlayerUid = currentData.player1.uid;
+                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+                return currentData;
+            }
         }
         currentData.turn += 1;
         currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
@@ -735,6 +794,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         const meKey = currentData.player1.uid === currentUserId ? 'player1' : 'player2';
         const opponentKey = meKey === 'player1' ? 'player2' : 'player1';
 
+        if (currentData[meKey].abilityUsesLeft !== undefined && currentData[meKey].abilityUsesLeft <= 0) {
+            if (!currentData.log) currentData.log = [];
+            currentData.log.push(`${currentData[meKey].displayName} has no ability uses left!`);
+            return;
+        }
+
         if (!currentData.log) currentData.log = [];
 
         const abilityType = currentData[meKey].selectedBird.abilityType;
@@ -761,6 +826,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             } else {
                 currentData.log.push(`${currentData[meKey].displayName}'s stun attempt failed.`);
             }
+        }
+
+        // Decrement ability uses (2 per match max)
+        if (currentData[meKey].abilityUsesLeft !== undefined) {
+            currentData[meKey].abilityUsesLeft -= 1;
         }
 
         // Start ability cooldown
@@ -939,20 +1009,29 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                 }
 
                 if (currentData[meKey].currentHealth <= 0) {
-                    currentData.winner = opponent?.uid;
-                    currentData.status = 'finished';
-                    currentData.log.push(`Bot wins!`);
-                    return currentData;
+                    return processRoundEnd(currentData, opponentKey, meKey, opponent?.uid || '');
                 }
-                if (currentData.turn >= 10) {
-                    currentData.status = 'finished';
+                if (currentData.turn >= MAX_TURNS_PER_ROUND) {
                     const p1Health = currentData.player1.currentHealth;
                     const p2Health = currentData.player2.currentHealth;
-                    if (p1Health > p2Health) currentData.winner = currentData.player1.uid;
-                    else if (p2Health > p1Health) currentData.winner = currentData.player2.uid;
-                    else currentData.winner = 'draw';
-                    currentData.log.push("Time's up! Winner by health.");
-                    return currentData;
+                    if (p1Health > p2Health) {
+                        return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
+                    } else if (p2Health > p1Health) {
+                        return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
+                    } else {
+                        if (!currentData.log) currentData.log = [];
+                        currentData.log.push("Round draw! Starting next round...");
+                        currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+                        currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+                        currentData.player1.activeEffects = {};
+                        currentData.player2.activeEffects = {};
+                        currentData.turn = 1;
+                        currentData.currentRound = (currentData.currentRound || 1) + 1;
+                        currentData.currentTurnPlayerUid = currentData.player1.uid;
+                        currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+                        currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+                        return currentData;
+                    }
                 }
                 currentData.turn += 1;
                 currentData.currentTurnPlayerUid = currentData[meKey].uid;
@@ -995,10 +1074,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   }
 
   const isP1 = me.uid === gameState.player1.uid;
-  const p1MovesLeft = 5 - Math.floor((gameState.turn - 1) / 2);
-  const p2MovesLeft = 5 - Math.floor(gameState.turn / 2);
-  const myMovesLeft = isP1 ? p1MovesLeft : p2MovesLeft;
-  const opponentMovesLeft = isP1 ? p2MovesLeft : p1MovesLeft;
+  const myWins = me.wins || 0;
+  const oppWins = opponent.wins || 0;
+  const currentRound = gameState.currentRound || 1;
   const turnTimePercent = turnTimeLeft !== null ? (turnTimeLeft / 30) * 100 : 0;
   const isTimeLow = turnTimeLeft !== null && turnTimeLeft <= 10;
 
@@ -1022,9 +1100,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         <PingIndicator />
       </div>
 
+      {/* Round indicator bar */}
+      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-black/70 px-3 py-1 rounded-full border border-yellow-500/50">
+        <span className="text-[10px] font-bold text-yellow-400">R{currentRound}</span>
+        <span className="text-[10px] text-white">|</span>
+        <span className="text-[10px] text-green-400">{me.displayName?.split(' ')[0] || 'P1'} {myWins}</span>
+        <span className="text-[10px] text-gray-400">-</span>
+        <span className="text-[10px] text-red-400">{oppWins} {opponent.displayName?.split(' ')[0] || 'P2'}</span>
+      </div>
+
       {/* Left/Opponent section */}
       <div className="flex flex-col landscape:w-1/4 landscape:h-full p-1 sm:p-2">
-        <PlayerDisplay player={opponent} isTurn={!isMyTurn && isGameActive} movesLeft={opponentMovesLeft} isP1={!isP1} />
+        <PlayerDisplay player={opponent} isTurn={!isMyTurn && isGameActive} roundWins={oppWins} isP1={!isP1} />
       </div>
 
       {/* Center Battle Area */}
@@ -1104,7 +1191,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
       {/* Right/My section */}
       <div className="flex flex-col landscape:w-1/4 landscape:h-full p-1 sm:p-2">
-        <PlayerDisplay player={me} isTurn={isMyTurn && isGameActive} movesLeft={myMovesLeft} isP1={isP1} />
+        <PlayerDisplay player={me} isTurn={isMyTurn && isGameActive} roundWins={myWins} isP1={isP1} />
 
         {/* Action Buttons */}
         <div className="mt-1 sm:mt-2 flex flex-col gap-1.5">
@@ -1211,7 +1298,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   );
 };
 
-const PlayerDisplay: React.FC<{ player: MatchPlayer, isTurn: boolean, movesLeft: number, isP1: boolean }> = ({ player, isTurn, movesLeft, isP1 }) => {
+const PlayerDisplay: React.FC<{ player: MatchPlayer, isTurn: boolean, roundWins: number, isP1: boolean }> = ({ player, isTurn, roundWins, isP1 }) => {
     if (!player || !player.selectedBird) return null;
     const healthPercent = (player.currentHealth / player.selectedBird.maxHealth) * 100;
     const { rankName } = getRankInfo(player.rankPoints);
@@ -1242,8 +1329,9 @@ const PlayerDisplay: React.FC<{ player: MatchPlayer, isTurn: boolean, movesLeft:
                 </div>
             </div>
             <div className="text-right flex-shrink-0 ml-1">
-                {movesLeft <= 2 && movesLeft > 0 && <p className="font-pixel text-[10px] sm:text-sm text-yellow-400">{movesLeft}</p>}
-                {movesLeft > 2 && <p className="font-pixel text-[10px] sm:text-sm text-white mt-1">{movesLeft}</p>}
+                {[...Array(2)].map((_, i) => (
+                    <span key={i} className={`inline-block w-2.5 h-2.5 rounded-full mx-0.5 ${i < roundWins ? 'bg-yellow-400 shadow-[0_0_4px_rgba(250,204,21,0.8)]' : 'bg-gray-600 border border-gray-500'}`}></span>
+                ))}
             </div>
         </div>
         <div className="mt-1 sm:mt-2 w-full bg-black h-4 sm:h-5 border border-black p-0.5 relative z-20">
