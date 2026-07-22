@@ -301,7 +301,7 @@ const InventoryView: React.FC<{ player: Player }> = ({ player }) => {
     { name: 'Duo Card', icon: <Mail className="text-pink-400" size={24} />, description: 'Send Duo request.', count: player.dynamicDuoCards || 0 },
     { name: 'Name Change', icon: <Tag className="text-blue-400" size={24} />, description: 'Change display name.', count: player.nameChangeCards || 0 },
     { name: 'Room Card', icon: <Ticket className="text-yellow-400" size={24} />, description: 'Create custom room.', count: player.normalCustomCards || 0 },
-    { name: 'Drone Card', icon: <Video className="text-green-400" size={24} />, description: 'Create drone room.', count: player.droneCustomCards || 0 },
+    { name: 'Esports Card', icon: <Video className="text-green-400" size={24} />, description: 'Create esports room.', count: player.droneCustomCards || 0 },
   ], [player]);
 
   const hasItems = inventoryItems.some(item => item.count > 0);

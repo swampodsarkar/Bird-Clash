@@ -218,7 +218,7 @@ const GiftModal: React.FC<GiftModalProps> = ({ player, onClose }) => {
                     gift = { ...gift, itemId, amount, name: `${amount}x ${INSECT_DEFINITIONS[itemId]?.name}`, icon: INSECT_DEFINITIONS[itemId]?.icon };
                     break;
                 case 'drone_custom_card':
-                    gift = { ...gift, amount, name: `${amount}x Drone Card`, icon: '📹' };
+                    gift = { ...gift, amount, name: `${amount}x Esports Card`, icon: '🏆' };
                     break;
             }
 
@@ -252,7 +252,7 @@ const GiftModal: React.FC<GiftModalProps> = ({ player, onClose }) => {
                         <option value="bird">Bird</option>
                         <option value="insect">Insect</option>
                         <option value="badge">Badge</option>
-                        <option value="drone_custom_card">Drone Custom Card</option>
+                        <option value="drone_custom_card">Esports Card</option>
                     </select>
 
                     { (giftType === 'coins' || giftType === 'gems' || giftType === 'insect' || giftType === 'drone_custom_card') && (

@@ -8,10 +8,10 @@ const roomsRef = rtdb.ref('custom_rooms');
 const invitesRef = rtdb.ref('room_invites');
 
 // Create a new room
-export const createRoom = async (player: Player, roomType: 'normal' | 'drone'): Promise<CustomRoom> => {
-    const cardType = roomType === 'normal' ? 'normalCustomCards' : 'droneCustomCards';
+export const createRoom = async (player: Player, roomType: 'normal' | 'esports'): Promise<CustomRoom> => {
+    const cardType = roomType === 'esports' ? 'droneCustomCards' : 'normalCustomCards';
     if ((player[cardType] || 0) < 1) {
-        throw new Error(`You need a ${roomType === 'normal' ? 'Normal' : 'Drone'} Custom Card to create this room.`);
+        throw new Error(`You need a ${roomType === 'normal' ? 'Normal' : 'Esports'} Card to create this room.`);
     }
 
     const newRoomRef = roomsRef.push();

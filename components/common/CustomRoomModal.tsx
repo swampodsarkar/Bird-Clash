@@ -14,7 +14,7 @@ interface CustomRoomModalProps {
 
 const CustomRoomModal: React.FC<CustomRoomModalProps> = ({ isOpen, onClose, player, onEnterRoom }) => {
     const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
-    const [roomType, setRoomType] = useState<'normal' | 'drone'>('normal');
+    const [roomType, setRoomType] = useState<'normal' | 'esports'>('normal');
     const [joinRoomId, setJoinRoomId] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -68,9 +68,9 @@ const CustomRoomModal: React.FC<CustomRoomModalProps> = ({ isOpen, onClose, play
                                 <p className="text-xs">Cost: 1 Normal Card</p>
                                 <p className="text-xs">You have: {player.normalCustomCards || 0}</p>
                             </button>
-                             <button onClick={() => setRoomType('drone')} className={`p-2 border-2 ${roomType === 'drone' ? 'border-yellow-400 bg-yellow-900/50' : 'border-black bg-gray-900'}`}>
-                                <p className="font-bold">📹 Drone</p>
-                                <p className="text-xs">Cost: 1 Drone Card</p>
+                             <button onClick={() => setRoomType('esports')} className={`p-2 border-2 ${roomType === 'esports' ? 'border-yellow-400 bg-yellow-900/50' : 'border-black bg-gray-900'}`}>
+                                <p className="font-bold">🏆 Esports</p>
+                                <p className="text-xs">Cost: 1 Esports Card</p>
                                 <p className="text-xs">You have: {player.droneCustomCards || 0}</p>
                             </button>
                         </div>

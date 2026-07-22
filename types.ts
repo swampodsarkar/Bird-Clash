@@ -319,7 +319,7 @@ export interface Match {
     winner: string | 'draw' | 'team1' | 'team2' | null;
     createdAt: number;
     startTime: number;
-    matchType: 'rank' | 'classic' | 'war' | 'drone';
+    matchType: 'rank' | 'classic' | 'war' | 'esports';
     matchMode?: '1v1' | '2v2';
     warContext?: {
         warId: string;
@@ -351,7 +351,7 @@ export interface MatchResult {
     opponentDamageDealt: number;
     myTeamDamageDealt?: number;
     opponentTeamDamageDealt?: number;
-    matchType: 'rank' | 'classic' | 'war' | 'drone';
+    matchType: 'rank' | 'classic' | 'war' | 'esports';
 }
 
 export interface MatchHistoryEntry {
@@ -361,7 +361,7 @@ export interface MatchHistoryEntry {
     myDamageDealt: number;
     opponentDamageDealt: number;
     outcome: 'win' | 'loss' | 'draw';
-    matchType: 'rank' | 'classic' | 'war' | 'drone';
+    matchType: 'rank' | 'classic' | 'war' | 'esports';
     rankPointChange: number;
     timestamp: number;
 }
@@ -389,7 +389,7 @@ export interface CustomRoom {
   guestDisplayName: string | null;
   guestPhotoURL: string | null;
   status: 'waiting' | 'full';
-  roomType: 'normal' | 'drone';
+  roomType: 'normal' | 'esports';
   matchId: string | null;
   createdAt: number;
 }
