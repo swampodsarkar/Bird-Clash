@@ -539,7 +539,8 @@ const Game: React.FC = () => {
 
   // One-time data migration for admin
   useEffect(() => {
-    if (user?.email === ADMIN_EMAIL && !isAdminExited) {
+    const isAdmin = user?.email === ADMIN_EMAIL || user?.uid === ADMIN_UID;
+    if (isAdmin && !isAdminExited) {
       const runMigration = async () => {
         const migrationRef = rtdb.ref('migrations/removedApexCondor');
         const snapshot = await migrationRef.once('value');
@@ -758,7 +759,7 @@ const Game: React.FC = () => {
     </div>
   );
 
-  if (maintenanceMode && user?.email !== ADMIN_EMAIL) {
+  if (maintenanceMode && user?.email !== ADMIN_EMAIL && user?.uid !== ADMIN_UID) {
       return <MaintenanceScreen />;
   }
   
@@ -771,7 +772,8 @@ const Game: React.FC = () => {
   }
   
   // If the user is an admin and hasn't explicitly exited to the game view
-  if (user && user.email === ADMIN_EMAIL && !isAdminExited) {
+  const isCurrentAdmin = user && (user.email === ADMIN_EMAIL || user.uid === ADMIN_UID);
+  if (isCurrentAdmin && !isAdminExited) {
     return (
         <div className="w-full">
             <AdminView onExit={() => setIsAdminExited(true)} />

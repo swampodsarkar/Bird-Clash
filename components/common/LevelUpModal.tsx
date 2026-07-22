@@ -10,11 +10,14 @@ interface LevelUpModalProps {
 const LevelUpModal: React.FC<LevelUpModalProps> = ({ newLevel, rewards, onClose }) => {
     const [stage, setStage] = useState<'level' | 'rewards' | 'done'>('level');
 
+    const hasRewards = (rewards.coins ?? 0) > 0 || (rewards.gems ?? 0) > 0;
+
     useEffect(() => {
+        if (!hasRewards) { setStage('done'); return; }
         const t1 = setTimeout(() => setStage('rewards'), 1500);
         const t2 = setTimeout(() => setStage('done'), 3000);
         return () => { clearTimeout(t1); clearTimeout(t2); };
-    }, []);
+    }, [hasRewards]);
 
     return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
@@ -30,18 +33,18 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ newLevel, rewards, onClose 
                         </p>
                     </div>
                 )}
-                {stage === 'rewards' && (
+                {stage === 'rewards' && (rewards.coins || rewards.gems) && (
                     <div className="animate-fade-in">
                         <span className="text-5xl block mb-2">🎁</span>
                         <h2 className="text-xl font-bold text-white mb-4 font-pixel">REWARDS</h2>
                         <div className="space-y-2">
-                            {rewards.coins && (
+                            {rewards.coins !== undefined && rewards.coins > 0 && (
                                 <div className="flex items-center justify-center gap-3 bg-yellow-800/60 border border-yellow-500 rounded-xl p-3">
                                     <span className="text-2xl">🪙</span>
                                     <span className="text-2xl font-bold text-yellow-300">+{rewards.coins}</span>
                                 </div>
                             )}
-                            {rewards.gems && (
+                            {rewards.gems !== undefined && rewards.gems > 0 && (
                                 <div className="flex items-center justify-center gap-3 bg-purple-800/60 border border-purple-500 rounded-xl p-3">
                                     <span className="text-2xl">💎</span>
                                     <span className="text-2xl font-bold text-purple-300">+{rewards.gems}</span>

@@ -255,16 +255,12 @@ export const createBotMatch = async (player: Player, selectedBird: Bird): Promis
     const availableBirds = Object.values(BIRD_DEFINITIONS).filter(b => availableRarities.includes(b.rarity));
     const botBirdDef = availableBirds[Math.floor(Math.random() * availableBirds.length)];
     
-    // 3. Calculate Bot Bird's Stats
+    // 3. Calculate Bot Bird's Stats — spread BIRD_DEFINITIONS to copy ability/ultimate fields
     let botBird: Bird = {
-        id: botBirdDef.id,
-        name: botBirdDef.name,
-        rarity: botBirdDef.rarity,
-        skillDescription: botBirdDef.skillDescription,
+        ...botBirdDef,
         level: botLevel,
         xp: 0,
         xpToNextLevel: 0, // Not needed for bot
-        icon: botBirdDef.icon,
         skillPower: botBirdDef.baseAttackPower + (botBirdDef.attackPowerPerLevel * (botLevel - 1)),
         maxHealth: botBirdDef.baseHealth + (botBirdDef.healthPerLevel * (botLevel - 1)),
     };
@@ -382,15 +378,11 @@ export const getPlayerEquippedBird = (player: Player): Bird => {
     // Final fallback to Tappy if no birds are owned (shouldn't happen for existing players)
     const tappyDef = BIRD_DEFINITIONS['B001'];
     return {
-        id: tappyDef.id,
-        name: tappyDef.name,
-        rarity: tappyDef.rarity,
-        skillDescription: tappyDef.skillDescription,
+        ...tappyDef,
         skillPower: tappyDef.baseAttackPower,
         level: 1,
         xp: 0,
         xpToNextLevel: tappyDef.baseXpToNextLevel,
-        icon: tappyDef.icon,
         maxHealth: tappyDef.baseHealth,
         powerLevel: 1,
         healthLevel: 1,
@@ -421,14 +413,11 @@ export const forfeitMatch = async (matchId: string, userId: string) => {
     const matchRef = rtdb.ref(`matches/${matchId}`);
     await matchRef.transaction(currentData => {
         if (!currentData || currentData.status !== 'active') return;
-        if (currentData.player1.uid === userId) {
-            currentData.winner = currentData.player2.uid;
-        } else {
-            currentData.winner = currentData.player1.uid;
-        }
+        const forfeiterKey = currentData.player1.uid === userId ? 'player1' : 'player2';
+        currentData.winner = forfeiterKey === 'player1' ? currentData.player2.uid : currentData.player1.uid;
         currentData.status = 'finished';
         if (!currentData.log) currentData.log = [];
-        currentData.log.push(`${userId} forfeited the match.`);
+        currentData.log.push(`${currentData[forfeiterKey].displayName} forfeited the match.`);
         return currentData;
     });
 };

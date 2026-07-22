@@ -565,14 +565,20 @@ export const addPlayerXpAndLevelUp = async (uid: string, xpToAdd: number): Promi
             }
             if (gainedLevels.length > 0) {
                 const topLevel = gainedLevels[gainedLevels.length - 1];
-                const reward = LEVEL_UP_REWARDS[topLevel];
-                if (reward) {
-                    if (reward.coins) player.coins = (player.coins || 0) + reward.coins;
-                    if (reward.gems) player.gems = (player.gems || 0) + reward.gems;
+                let totalCoins = 0;
+                let totalGems = 0;
+                for (const lvl of gainedLevels) {
+                    const r = LEVEL_UP_REWARDS[lvl];
+                    if (r) {
+                        totalCoins += r.coins || 0;
+                        totalGems += r.gems || 0;
+                    }
                 }
+                if (totalCoins > 0) player.coins = (player.coins || 0) + totalCoins;
+                if (totalGems > 0) player.gems = (player.gems || 0) + totalGems;
                 result = {
                     newLevel: topLevel,
-                    rewards: reward || { coins: 0 },
+                    rewards: { coins: totalCoins || undefined, gems: totalGems || undefined },
                     leveledUp: true,
                 };
             }

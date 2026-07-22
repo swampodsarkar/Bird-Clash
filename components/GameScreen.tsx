@@ -238,7 +238,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
   const isOpponentBot = useMemo(() => opponent?.isBot === true, [opponent]);
 
-  // --- Auto-forfeit on opponent disconnect ---
+  // --- Auto-forfeit on opponent disconnect (runs once per match) ---
   useEffect(() => {
     if (!gameState || gameState.status !== 'active' || isOpponentBot) return;
     if (!opponent?.uid) return;
@@ -255,27 +255,35 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
     });
 
     // Watch opponent's disconnect status
+    let forfeitTimer: number | null = null;
     const opponentDisconnectRef = rtdb.ref(`matches/${match.id}/disconnections/${opponent.uid}`);
     const listener = (snap: firebase.database.DataSnapshot) => {
-      if (!snap.exists()) return;
+      if (!snap.exists()) {
+        if (forfeitTimer) { clearTimeout(forfeitTimer); forfeitTimer = null; }
+        return;
+      }
       const data = snap.val();
-      if (!data || !data.disconnectedAt) return;
-      const elapsed = Date.now() - data.disconnectedAt;
-      const timeSinceDisconnect = elapsed > 15000; // 15 second grace period
-      if (timeSinceDisconnect) {
-        // Opponent disconnected and is gone — auto-win
-        gameService.forfeitMatch(match.id, opponent.uid).catch(() => {});
+      if (!data || !data.disconnectedAt) {
+        if (forfeitTimer) { clearTimeout(forfeitTimer); forfeitTimer = null; }
+        return;
+      }
+      // Start a 15s grace period timer
+      if (!forfeitTimer) {
+        forfeitTimer = window.setTimeout(() => {
+          gameService.forfeitMatch(match.id, opponent.uid).catch(() => {});
+        }, 15000);
       }
     };
     opponentDisconnectRef.on('value', listener);
 
     return () => {
+      if (forfeitTimer) clearTimeout(forfeitTimer);
       myDisconnectRef.onDisconnect().cancel();
       myDisconnectRef.remove().catch(() => {});
       opponentDisconnectRef.off('value', listener);
       allDisconnectsRef.remove().catch(() => {});
     };
-  }, [gameState?.id, gameState?.status, opponent?.uid, currentUserId, match.id, isOpponentBot]);
+  }, [currentUserId, match.id, opponent?.uid, isOpponentBot]);
 
   // Turn Timer Logic
   useEffect(() => {
@@ -313,14 +321,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   // Calculate potential damage for preview
   const potentialDamage = useMemo(() => {
       if (!me || !opponent) return 0;
+      if (opponent.activeEffects?.invulnerable) return 0;
+
       let damage = me.selectedBird.skillPower;
+
+      if (me.activeEffects?.doubleAttack) {
+          damage *= 2;
+      }
 
       if (me.currentHealth / me.selectedBird.maxHealth <= 0.3) {
           damage = Math.floor(damage * 1.2);
       }
 
-      if (opponent.activeEffects?.defenseBuff || opponent.activeEffects?.blocking) {
+      if (opponent.activeEffects?.blocking) {
+          damage = Math.floor(damage * 0.3);
+      } else if (opponent.activeEffects?.defenseBuff) {
           damage = Math.floor(damage * 0.5);
+      }
+
+      if (opponent.activeEffects?.shield) {
+          damage = Math.max(0, damage - opponent.activeEffects.shield);
       }
       return damage;
   }, [me, opponent]);
@@ -483,6 +503,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
                 currentData[meKey].ultimateCooldownLeft -= 1;
             }
+            if (currentData[meKey].abilityCooldownLeft && currentData[meKey].abilityCooldownLeft > 0) {
+                currentData[meKey].abilityCooldownLeft -= 1;
+            }
             currentData.turn += 1;
             currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
             currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
@@ -618,6 +641,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
     setIsSubmitting(true);
     const matchRef = rtdb.ref(`matches/${match.id}`);
+
+    let ultEffect: 'ultimate' | 'heal' | null = null;
+
     matchRef.transaction(currentData => {
         if (!currentData || currentData.status !== 'active' || currentData.currentTurnPlayerUid !== currentUserId) return;
         const meKey = currentData.player1.uid === currentUserId ? 'player1' : 'player2';
@@ -644,12 +670,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             }
             currentData[opponentKey].currentHealth -= damage;
             currentData[meKey].damageDealt += damage;
-            spawnParticles('ultimate', 8);
-            setActiveEffect('ultimate');
-            soundManager.play('ultimate');
+            ultEffect = 'ultimate';
         } else if (ultimateType === 'FULL_HEAL') {
             currentData[meKey].currentHealth = currentData[meKey].selectedBird.maxHealth;
-            spawnParticles('heal', 8);
+            ultEffect = 'heal';
         } else if (ultimateType === 'INVULNERABILITY') {
             if (!currentData[meKey].activeEffects) currentData[meKey].activeEffects = {};
             currentData[meKey].activeEffects.invulnerable = true;
@@ -683,6 +707,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             turnDuration: 30,
         };
         return currentData;
+    }).then(() => {
+        if (ultEffect) {
+            spawnParticles(ultEffect, 8);
+            setActiveEffect(ultEffect);
+            if (ultEffect === 'ultimate') soundManager.play('ultimate');
+        }
     }).catch(error => toast.error("Ultimate failed."))
       .finally(() => setIsSubmitting(false));
   }, [isMyTurn, isSubmitting, currentUserId, match.id, me]);
@@ -693,6 +723,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
     const birdDef = me?.selectedBird;
     if (!birdDef || !birdDef.abilityType) return;
+    if (me?.abilityCooldownLeft && me.abilityCooldownLeft > 0) {
+        toast.info(`Ability is on cooldown for ${me.abilityCooldownLeft} more turns.`);
+        return;
+    }
 
     setIsSubmitting(true);
     const matchRef = rtdb.ref(`matches/${match.id}`);
