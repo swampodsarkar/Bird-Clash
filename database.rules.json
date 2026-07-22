@@ -1,0 +1,219 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        // Admin can write to any user, users can write to their own data.
+        ".write": "auth != null && (auth.uid === $uid || auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83')",
+        ".read": "auth != null",
+        "inventory": {
+          "insects": {
+            "$insectId": {
+              ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0)"
+            }
+          }
+        }
+      },
+      ".indexOn": ["rankPoints", "displayName", "email", "dailyRankPoints", "weeklyRankPoints"]
+    },
+
+    "mail": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        // Allow authenticated users to write (for claiming) and admins to send gifts.
+        ".write": "auth != null",
+        ".indexOn": "timestamp"
+      }
+    },
+
+    "reports": {
+      // Only admin can read reports.
+      ".read": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'",
+      // Any authenticated user can write (submit) a report.
+      ".write": "auth != null"
+    },
+    
+    "gameConfig": {
+      ".read": "auth != null",
+      // Only admin can modify the game config
+      ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+    },
+    "contentConfig": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+    },
+    "notifications": {
+      ".read": "auth != null",
+       // Only admin can write notifications
+      ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+    },
+    "events": {
+      ".read": "auth != null",
+       // Only admin can manage events
+      ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+    },
+
+    "clans": {
+      ".read": "auth != null",
+      "$clanId": {
+        ".write": "auth != null"
+      },
+      ".indexOn": ["totalRankPoints", "name"]
+    },
+
+    "friends": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null"
+      }
+    },
+    
+    "chat": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": "timestamp"
+    },
+
+    "clan_chat": {
+      "$clanId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": "timestamp"
+      }
+    },
+    
+    "clan_food_requests": {
+      "$clanId": {
+        ".read": "auth != null && root.child('clans').child($clanId).child('members').child(auth.uid).exists()",
+        "$requestId": {
+          ".write": "auth != null && root.child('clans').child($clanId).child('members').child(auth.uid).exists()"
+        }
+      }
+    },
+
+    "royale_pass_definitions": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+    },
+
+    "store_items": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+    },
+
+    "matchHistory": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      },
+      ".indexOn": "timestamp"
+    },
+    
+    "clan_wars": {
+      ".read": "auth != null",
+      "current": {
+        ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+      }
+    },
+
+    "tournaments": {
+      ".read": "auth != null",
+      "$tournamentId": {
+        // Admin can write everything. Users can write only to register for an upcoming tournament.
+        // Registration is valid if:
+        // 1. Tournament status is 'upcoming'.
+        // 2. They are adding themselves to the players list (and weren't there before).
+        // 3. They are incrementing playerCount by exactly 1.
+        // 4. They are not changing immutable properties like name, description, maxPlayers.
+        ".write": "auth != null && (auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83' || (newData.child('status').val() === 'upcoming' && data.child('status').val() === 'upcoming' && newData.child('players').child(auth.uid).exists() && !data.child('players').child(auth.uid).exists() && newData.child('playerCount').val() === (data.child('playerCount').val() || 0) + 1 && newData.child('name').val() === data.child('name').val() && newData.child('description').val() === data.child('description').val() && newData.child('maxPlayers').val() === data.child('maxPlayers').val()))"
+      },
+      ".indexOn": "createdAt"
+    },
+    
+    "queue": {
+      "$matchType": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    
+    "matches": {
+      "$matchId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    
+    "player_matches": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null"
+      }
+    },
+
+    "player_invites": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null"
+      }
+    },
+
+    "custom_rooms": {
+      ".read": "auth != null",
+      "$roomId": {
+        ".write": "auth != null && (
+                    // Host creates a new room
+                    !data.exists() && newData.child('hostUid').val() === auth.uid ||
+                    // Host has full control over their own room
+                    data.child('hostUid').val() === auth.uid ||
+                    // An existing guest can leave
+                    (data.child('guestUid').val() === auth.uid && !newData.child('guestUid').exists()) ||
+                    // A new guest can join a room that is waiting and empty
+                    (
+                      data.exists() &&
+                      data.child('status').val() === 'waiting' &&
+                      !data.child('guestUid').exists() && 
+                      newData.child('guestUid').val() === auth.uid &&
+                      newData.child('status').val() === 'full' &&
+                      newData.child('hostUid').val() === data.child('hostUid').val()
+                    )
+                  )"
+      }
+    },
+
+    "room_invites": {
+      "$uid": {
+        // Can read your own invites.
+        ".read": "auth != null && auth.uid === $uid",
+        // Anyone authenticated can write an invite to someone else.
+        ".write": "auth != null"
+      }
+    },
+
+    "status": {
+      "maintenance": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+      },
+      "$uid": {
+         ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "purchase_requests": {
+      ".read": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'",
+      "$requestId": {
+        ".write": "auth != null && (auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83' || (!data.exists() && newData.child('uid').val() === auth.uid))",
+        ".read": "auth != null && (auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83' || data.child('uid').val() === auth.uid)"
+      },
+      ".indexOn": ["status", "uid"]
+    },
+    "migrations": {
+      ".read": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'",
+      ".write": "auth != null && auth.uid === 'mnFIIa37J2Tusva0efCp7M3tgE83'"
+    }
+  }
+}

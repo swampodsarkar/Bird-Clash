@@ -1,0 +1,5 @@
+{
+  "name": "Bird Clash Fever",
+  "description": "A 1v1 PvP web game where players compete in a tapping duel. Collect and upgrade birds with unique skills, feed them insects, and battle for supremacy. Features real-time multiplayer with Firebase.",
+  "requestFramePermissions": []
+}
