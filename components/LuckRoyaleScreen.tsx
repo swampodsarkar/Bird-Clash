@@ -70,7 +70,7 @@ const LuckRoyaleScreen: React.FC<LuckRoyaleScreenProps> = ({ player }) => {
   const handlePaidSpin = async () => {
     if (!user || isSpinning) return;
     const spinFunction = activeTab === 'gold' ? spinGoldRoyale : spinDiamondRoyale;
-    const cost = activeTab === 'gold' ? 100 : 9 * Math.pow(2, player.diamondSpins || 0);
+    const cost = activeTab === 'gold' ? 100 : 20;
     const currency = activeTab === 'gold' ? 'coins' : 'gems';
 
     if (player[currency] < cost) {
@@ -102,7 +102,7 @@ const LuckRoyaleScreen: React.FC<LuckRoyaleScreenProps> = ({ player }) => {
 
   const goldSpins = player.goldSpins || 0;
   const diamondSpins = player.diamondSpins || 0;
-  const currentCost = activeTab === 'gold' ? 100 : 9 * Math.pow(2, diamondSpins);
+  const currentCost = activeTab === 'gold' ? 100 : 20;
   const progress = activeTab === 'gold' ? (goldSpins % 1000) / 10 : (diamondSpins % 25) * 4;
   const maxProgress = activeTab === 'gold' ? 1000 : 25;
   const currentProgressCount = activeTab === 'gold' ? goldSpins % 1000 : diamondSpins % 25;

@@ -966,8 +966,8 @@ export const spinDiamondRoyale = async (uid: string): Promise<{ message: string 
     const { committed, snapshot } = await userRef.transaction(player => {
         if (!player) return; // Abort
 
-        cost = 9 * Math.pow(2, player.diamondSpins || 0);
-        if ((player.gems || 0) < cost) return; // Abort
+        cost = 20;
+        if ((player.gems || 0) < cost) return;
 
         player.gems -= cost;
         player.diamondSpins = (player.diamondSpins || 0) + 1;
@@ -988,9 +988,7 @@ export const spinDiamondRoyale = async (uid: string): Promise<{ message: string 
     });
     
     if (!committed) {
-        const playerAfter = snapshot.val();
-        cost = 9 * Math.pow(2, (playerAfter?.diamondSpins || 0));
-        throw new Error(`Not enough gems. You need ${cost} gems to spin Diamond Royale.`);
+        throw new Error(`Not enough gems. You need 20 gems to spin Diamond Royale.`);
     }
 
     return { message: resultMessage };

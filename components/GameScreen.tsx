@@ -832,6 +832,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           </div>
       )}
 
+      {/* Ping indicator - top right corner */}
+      <div className="absolute top-1 right-1 z-50">
+        <PingIndicator />
+      </div>
+
       {/* Left/Opponent section */}
       <div className="flex flex-col landscape:w-1/4 landscape:h-full p-1 sm:p-2">
         <PlayerDisplay player={opponent} isTurn={!isMyTurn && isGameActive} movesLeft={opponentMovesLeft} isP1={!isP1} />
@@ -864,7 +869,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           </div>
 
           <div className="flex flex-col items-center gap-1 bg-black/60 p-2 sm:p-3 border-2 border-black z-10 min-w-[100px]">
-            <PingIndicator />
             <h2 className="text-sm sm:text-lg font-bold text-yellow-400 text-center">
               {isGameActive ? (isMyTurn ? "YOUR TURN" : `${opponent.displayName}'s Turn`) : "MATCH OVER"}
             </h2>
