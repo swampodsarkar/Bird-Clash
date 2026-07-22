@@ -16,6 +16,7 @@ import { Confetti } from './common/Confetti';
 import Button from './common/Button';
 import { useGameConfig } from '../hooks/useGameConfig';
 import { getRankInfo } from '../utils/helpers';
+import { ShareMatchModal } from './common/ShareMatchModal';
 
 const AnimatedCounter: React.FC<{ target: number, duration?: number }> = ({ target, duration = 1000 }) => {
     const [count, setCount] = useState(0);
@@ -56,6 +57,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
   const [showLog, setShowLog] = useState(false);
   const [streakProtected, setStreakProtected] = useState(false);
   const [closeCallBonus, setCloseCallBonus] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const { me, opponent } = useMemo(() => {
     if (match.player1.uid === currentUserId) {
@@ -278,11 +280,23 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
                 </div>
             )}
 
+            <Button onClick={() => setShowShareModal(true)} variant="secondary" className="w-full !py-2 !text-xs !bg-blue-700 !border-blue-500 hover:!bg-blue-600">
+              📤 Share Match
+            </Button>
+
             <Button onClick={onPlayAgain} className="w-full">
               Play Again
             </Button>
         </div>
       </div>
+      {showShareModal && (
+        <ShareMatchModal
+          match={match}
+          myUid={currentUserId}
+          myName={playerData.displayName || 'Player'}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </div>
   );
 };

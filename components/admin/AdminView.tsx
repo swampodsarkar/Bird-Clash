@@ -15,8 +15,9 @@ import EsportsManagement from './EsportsManagement';
 import ReportManagement from './ReportManagement';
 import BirdImageManagement from './BirdImageManagement';
 import BackgroundManagement from './BackgroundManagement';
+import EventManagement from './EventManagement';
 
-type Tab = 'Game Settings' | 'Players' | 'Store' | 'Royale Pass' | 'Purchases' | 'Esports' | 'Reports' | 'Bird Images' | 'Backgrounds';
+type Tab = 'Game Settings' | 'Players' | 'Store' | 'Royale Pass' | 'Purchases' | 'Esports' | 'Reports' | 'Bird Images' | 'Backgrounds' | 'Events';
 
 interface AdminViewProps {
     onExit: () => void;
@@ -36,6 +37,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onExit }) => {
             case 'Reports': return <ReportManagement />;
             case 'Bird Images': return <BirdImageManagement />;
             case 'Backgrounds': return <BackgroundManagement />;
+            case 'Events': return <EventManagement />;
             default: return null;
         }
     };

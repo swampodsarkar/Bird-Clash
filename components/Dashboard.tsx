@@ -40,6 +40,9 @@ import { useContentConfig } from '../hooks/useContentConfig';
 import Snowfall from './common/Snowfall';
 import CustomRoomModal from './common/CustomRoomModal';
 import BirdIcon from './common/BirdIcon';
+import { ReferralModal } from './common/ReferralModal';
+import { LimitedEventBanner } from './common/LimitedEventBanner';
+import { applyReferralCode } from '../services/referralService';
 
 
 type Tab = 'CHALLENGE' | 'QUESTS' | 'BIRDS' | 'STORE' | 'ROYALE_PASS' | 'LUCK_ROYALE' | 'SOCIAL' | 'LEADERBOARD' | 'ESPORTS' | 'PROFILE';
@@ -137,9 +140,10 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const [isMailboxOpen, setIsMailboxOpen] = useState(false);
     const [mailItems, setMailItems] = useState<MailItem[]>([]);
     const winterThemeActive = isWinterThemeActive();
-    const [isCustomRoomModalOpen, setIsCustomRoomModalOpen] = useState(false);
-    
-    const [hasUnreadGlobalMessages, setHasUnreadGlobalMessages] = useState(false);
+  const [isCustomRoomModalOpen, setIsCustomRoomModalOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  
+  const [hasUnreadGlobalMessages, setHasUnreadGlobalMessages] = useState(false);
 
     const { notifications } = useRealtime();
     const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
@@ -389,10 +393,12 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                     <SidebarButton icon={<Users size={20} />} label="Social" onClick={() => setActiveTab('SOCIAL')} isLocked={isSocialLocked} unlockLevel={3} />
                     <SidebarButton icon={<Calendar size={20} />} label="Events" onClick={() => setIsEventsModalOpen(true)} indicator={true} isLocked={isEventsLocked} unlockLevel={5} />
                     <SidebarButton icon={<Medal size={20} />} label="Esports" onClick={() => setActiveTab('ESPORTS')} isLocked={isEsportsLocked} unlockLevel={10} />
+                    <SidebarButton icon={<span style={{fontSize:20}}>🎁</span>} label="Refer" onClick={() => setIsReferralModalOpen(true)} />
                 </div>
 
                 {/* Central Content Area - Reduced Bird Scale and Padding */}
                 <div className="flex-grow flex flex-col gap-1 p-1 overflow-hidden relative">
+                    <LimitedEventBanner onEventClick={(event) => toast.info(`${event.title}: ${event.description}`)} />
                     <div className="flex-grow flex items-center justify-center bird-float pseudo-3d relative bird-idle">
                         {equippedBird ? (
                             <div className="text-center group">
@@ -416,13 +422,20 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                     {/* Controls and Buttons - Compact */}
                     <div className="flex-shrink-0 max-w-sm mx-auto w-full flex flex-col justify-center items-center gap-2 p-2 mb-2">
                         <div className="w-full p-2 bg-black/70 backdrop-blur-md space-y-2 border border-yellow-500/30 rounded-xl shadow-2xl">
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                                 <button
                                     onClick={() => setSelectedMode('rank')}
                                     className={`p-1.5 border-2 rounded-lg transition-all duration-200 ${selectedMode === 'rank' ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.3)]' : 'bg-black/40 border-gray-600 hover:border-gray-400 hover:bg-black/60'}`}
                                 >
                                     <p className="font-pixel text-xs md:text-sm text-white">RANKED</p>
                                     <p className="text-[9px] text-gray-300 font-bold uppercase tracking-wider">1v1 Battle</p>
+                                </button>
+                                <button
+                                    onClick={() => setSelectedMode('squad')}
+                                    className={`p-1.5 border-2 rounded-lg transition-all duration-200 ${selectedMode === 'squad' ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.3)]' : 'bg-black/40 border-gray-600 hover:border-gray-400 hover:bg-black/60'}`}
+                                >
+                                    <p className="font-pixel text-xs md:text-sm text-white">SQUAD</p>
+                                    <p className="text-[9px] text-gray-300 font-bold uppercase tracking-wider">2v2 Battle</p>
                                 </button>
                                 <button
                                     onClick={() => setSelectedMode('minigame')}
@@ -445,6 +458,13 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                                     onClick={() => {
                                         if (selectedMode === 'rank') {
                                             handleStartSoloMatchmaking();
+                                        } else if (selectedMode === 'squad') {
+                                            if (playerData.dynamicDuo?.status === 'active') {
+                                                handleStartSoloMatchmaking();
+                                                toast.info("Squad mode: inviting duo partner...");
+                                            } else {
+                                                toast.info("You need an active Dynamic Duo to play Squad mode! Go to Social tab.");
+                                            }
                                         } else if (selectedMode === 'minigame') {
                                             props.onStartMinigame();
                                         }
@@ -495,6 +515,15 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                 player={playerData}
                 onEnterRoom={onEnterRoom}
             />
+            {isReferralModalOpen && (
+                <ReferralModal
+                    player={playerData}
+                    onClose={() => setIsReferralModalOpen(false)}
+                    onApplyCode={async (code) => {
+                        await applyReferralCode(playerData.uid, code);
+                    }}
+                />
+            )}
         </div>
     );
 };

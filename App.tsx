@@ -35,6 +35,10 @@ import Snowfall from './components/common/Snowfall';
 import RoomView from './components/common/RoomView';
 import RoomInviteNotificationModal from './components/common/RoomInviteNotificationModal';
 import MatchmakingScreen from './components/MatchmakingScreen';
+import { initializeReferral, applyReferralCode } from './services/referralService';
+import { checkAndUpdateStreak } from './services/streakService';
+import { StreakModal } from './components/common/StreakModal';
+import type { LoginStreak } from './types';
 
 
 // --- Spectate Screen Component ---
@@ -327,6 +331,9 @@ const Game: React.FC = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showDailyRewardModal, setShowDailyRewardModal] = useState(false);
   const [foundMatchForVS, setFoundMatchForVS] = useState<Match | null>(null);
+  const [showStreakModal, setShowStreakModal] = useState(false);
+  const [streakData, setStreakData] = useState<{ streak: LoginStreak; reward: { coins: number; gems: number } | null } | null>(null);
+  const [showReferralModal, setShowReferralModal] = useState(false);
 
 
   // Listen for player data changes
@@ -486,6 +493,31 @@ const Game: React.FC = () => {
     }
   }, [gameState, playerData, config.RANK_ENTRY_FEE_COINS, foundMatchForVS]);
 
+
+  // Initialize referral on login
+  useEffect(() => {
+    if (user && playerData) {
+      initializeReferral(user.uid);
+      const params = new URLSearchParams(window.location.search);
+      const refCode = params.get('ref');
+      if (refCode && !playerData.referral?.referredBy) {
+        applyReferralCode(user.uid, refCode).catch(() => {});
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [user, playerData?.referral?.referredBy]);
+
+  // Check and update streak on login
+  useEffect(() => {
+    if (user && playerData && gameState === 'LOBBY') {
+      checkAndUpdateStreak(playerData).then(data => {
+        if (data.reward) {
+          setStreakData(data);
+          setShowStreakModal(true);
+        }
+      });
+    }
+  }, [user, playerData?.lastLogin, gameState]);
 
   // One-time data migration for admin
   useEffect(() => {
@@ -808,6 +840,9 @@ const Game: React.FC = () => {
     <div className="w-full h-full">
         {roomInvite && <RoomInviteNotificationModal invite={roomInvite} onAccept={handleAcceptRoomInvite} onDecline={handleDeclineRoomInvite} />}
         {renderContent()}
+        {showStreakModal && streakData && (
+          <StreakModal streak={streakData.streak} reward={streakData.reward} onClose={() => setShowStreakModal(false)} />
+        )}
     </div>
   );
 };

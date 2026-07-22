@@ -126,6 +126,50 @@ export interface DynamicDuo {
   since: number; // timestamp for when duo became active
 }
 
+export interface ReferralData {
+  referralCode: string;
+  referredBy?: string;
+  referrals: { [uid: string]: { timestamp: number; rewarded: boolean } };
+  referralRewardsClaimed: number;
+}
+
+export interface LoginStreak {
+  currentStreak: number;
+  longestStreak: number;
+  lastClaimDate: string;
+  nextRewardDay: number;
+}
+
+export interface LimitedEvent {
+  id: string;
+  title: string;
+  description: string;
+  type: 'special_bird' | 'bonus_coins' | 'bonus_gems' | 'double_xp' | 'special_battle';
+  startTime: number;
+  endTime: number;
+  reward?: { type: 'coins' | 'gems' | 'bird' | 'insect'; amount?: number; itemId?: string };
+  condition?: { type: 'wins' | 'matches' | 'damage'; target: number };
+  icon: string;
+  active: boolean;
+}
+
+export interface TournamentBracket {
+  id: string;
+  tournamentId: string;
+  round: number;
+  matches: BracketMatch[];
+}
+
+export interface BracketMatch {
+  matchId: string;
+  player1Uid: string;
+  player1Name: string;
+  player2Uid: string;
+  player2Name: string;
+  winnerUid: string | null;
+  status: 'pending' | 'active' | 'finished';
+}
+
 export interface Player {
   uid: string;
   displayName: string | null;
@@ -189,7 +233,9 @@ export interface Player {
   normalCustomCards?: number;
   droneCustomCards?: number;
   totalGemsToppedUp?: number;
-  consecutiveLosses?: number; // New: Track losing streak
+  consecutiveLosses?: number;
+  referral?: ReferralData;
+  loginStreak?: LoginStreak;
 }
 
 export interface ClanMember {

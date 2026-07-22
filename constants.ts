@@ -127,6 +127,24 @@ export const DAILY_QUESTS: Quest[] = [
   { id: 'q_deal_damage_500', description: 'Deal 500 total damage', type: 'dealDamage', target: 500, reward: { type: 'coins', amount: 500 } },
 ];
 
+export const REFERRAL_REWARDS = {
+  INVITER_GEMS: 50,
+  INVITER_COINS: 500,
+  REFERRED_GEMS: 25,
+  REFERRED_COINS: 200,
+  MAX_REFERRALS: 50,
+};
+
+export const STREAK_REWARDS: { [day: number]: { coins: number; gems: number } } = {
+  1: { coins: 100, gems: 0 },
+  2: { coins: 200, gems: 0 },
+  3: { coins: 300, gems: 5 },
+  4: { coins: 500, gems: 0 },
+  5: { coins: 700, gems: 10 },
+  6: { coins: 1000, gems: 0 },
+  7: { coins: 2000, gems: 25 },
+};
+
 export const FALLBACK_BOT_NAMES = [
     'Abdullah', 'Abir', 'Adnan', 'Afnan', 'Ahmed', 'Ahnaf', 'Akash', 'Alif', 'Amin', 'Anik', 'Anis', 'Arafat', 'Arham', 'Arif', 'Arifin', 'Arman', 'Asif', 'Atik', 'Ayan', 'Ayon', 'Azmain', 'Bappy', 'Bashar', 'Bilal', 'Dipu', 'Emon', 'Enamul', 'Fahad', 'Fahim', 'Faisal', 'Farhan', 'Faruque', 'Habib', 'Hamid', 'Hasan', 'Hasib', 'Hridoy', 'Ibrahim', 'Imran', 'Iqbal', 'Irfan', 'Ishraq', 'Jahid', 'Jamal', 'Jamil', 'Jisan', 'Joy', 'Kabir', 'Kamal', 'Karim', 'Khalid', 'Mahbub', 'Mahfuz', 'Mahmud', 'Masud', 'Mehedi', 'Minhaj', 'Mizan', 'Mohammad', 'Mohsin', 'Monir', 'Morshed', 'Mushfiqur', 'Nabil', 'Nadim', 'Nafis', 'Nahid', 'Nayeem', 'Nazmul', 'Nibir', 'Parvez', 'Rafan', 'Rafiq', 'Rafsan', 'Rahim', 'Rahman', 'Rahat', 'Rajib', 'Raju', 'Rakib', 'Rashed', 'Riad', 'Rifat', 'Rohan', 'Rubel', 'Sabbir', 'Sadman', 'Saiful', 'Sakib', 'Shakib', 'Salman', 'Sameer', 'Shanto', 'Shihab', 'Shuvo', 'Siam', 'Sumon', 'Tahsin', 'Tamim', 'Tanvir', 'Tariq'
 ];
