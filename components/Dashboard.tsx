@@ -352,10 +352,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                         </div>
                     </button>
                     {primeLevel > 0 && <PrimeLevelDisplay level={primeLevel} />}
-                    <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1">
-                        <span className="text-lg">{getRankInfo(playerData.rankPoints).tier.icon}</span>
-                        <span className="text-[10px] font-bold text-white font-pixel whitespace-nowrap">{getRankInfo(playerData.rankPoints).rankName}</span>
-                    </div>
+                    <span className="text-xl drop-shadow-lg">{getRankInfo(playerData.rankPoints).tier.icon}</span>
                 </div>
 
                 {/* Right: Currency + Actions */}
