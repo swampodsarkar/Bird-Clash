@@ -283,7 +283,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ player }) => {
 
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-y-auto pb-8 h-full">
       <div className="flex justify-between items-start flex-wrap gap-y-2 px-2">
         <div className="space-y-1">
             <h2 className="text-2xl font-bold text-yellow-400 flex items-center gap-2">

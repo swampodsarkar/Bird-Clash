@@ -337,55 +337,55 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             backgroundPosition: 'center'
         }}>
             {winterThemeActive && <Snowfall />}
-            {/* Header - Polished HUD - Reduced Padding */}
-            <header className="px-2 py-1 flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-black/40 backdrop-blur-md border-b border-white/10 z-10 shadow-lg">
-                {/* Player Info */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => setActiveTab('PROFILE')} className="flex items-center space-x-2 text-left hover:scale-105 transition-transform duration-200">
-                        <PlayerAvatar photoURL={playerData.photoURL} uid={playerData.uid} activeBadge={playerData.activeBadge} sizeClassName="w-10 h-10 md:w-12 md:h-12" imgClassName="border-2 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)] rounded-lg"/>
-                        <div>
-                            <h2 className="text-xs md:text-sm font-bold font-pixel whitespace-nowrap text-white drop-shadow-md">{playerData.displayName || 'Player'}</h2>
-                             <div className="w-20 h-3 bg-gray-900 border border-gray-600 rounded-full mt-0.5 relative overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-yellow-500 to-yellow-300 rounded-full" 
-                                  style={{ width: `${((playerData.xp || 0) / (playerData.xpToNextLevel || 100)) * 100}%` }}
-                                ></div>
-                                <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white uppercase tracking-wider drop-shadow-md">LVL {playerData.level || 1}</span>
+            {/* Header - Clean HUD */}
+            <header className="px-2 py-1.5 flex-shrink-0 flex items-center justify-between gap-2 bg-gradient-to-r from-black/60 via-black/40 to-black/60 backdrop-blur-md border-b border-white/10 z-10 shadow-lg">
+                {/* Left: Player Info */}
+                <div className="flex items-center gap-2 min-w-0">
+                    <button onClick={() => setActiveTab('PROFILE')} className="flex items-center gap-2 text-left hover:scale-105 transition-transform duration-200 flex-shrink-0">
+                        <PlayerAvatar photoURL={playerData.photoURL} uid={playerData.uid} activeBadge={playerData.activeBadge} sizeClassName="w-9 h-9 md:w-10 md:h-10" imgClassName="border-2 border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.4)] rounded-lg"/>
+                        <div className="min-w-0">
+                            <h2 className="text-xs md:text-sm font-bold font-pixel text-white drop-shadow-md truncate max-w-[80px] sm:max-w-[150px]">{playerData.displayName || 'Player'}</h2>
+                            <div className="w-16 h-2.5 bg-gray-900 border border-gray-600 rounded-full mt-0.5 relative overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-yellow-500 to-yellow-300 rounded-full" style={{ width: `${((playerData.xp || 0) / (playerData.xpToNextLevel || 100)) * 100}%` }}></div>
+                                <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-white drop-shadow-md">LVL {playerData.level || 1}</span>
                             </div>
                         </div>
                     </button>
                     {primeLevel > 0 && <PrimeLevelDisplay level={primeLevel} />}
-                    <PlayerRankDisplay player={playerData} className="ml-1 scale-100" />
+                    <PlayerRankDisplay player={playerData} className="scale-90" />
                 </div>
 
-                {/* Actions and Currency */}
-                <div className="flex items-center justify-end flex-wrap gap-2 flex-grow">
-                    {isDailyClaimAvailable && <Button onClick={handleClaim} disabled={isClaiming} variant="success" className="!py-1 !px-2 !text-[10px] font-bold animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]">{isClaiming ? <Spinner /> : 'CLAIM'}</Button>}
-                    
-                    <div className="ff-currency-box text-yellow-400 !text-sm !py-1 !px-2">
-                        <span className="text-lg"><Coins size={18} /></span>
-                        <AnimatedNumber value={playerData.coins} />
+                {/* Right: Currency + Actions */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Coins */}
+                    <div className="flex items-center gap-1 bg-yellow-900/40 border border-yellow-600/40 rounded-lg px-2 py-1">
+                        <span className="text-yellow-400 text-sm font-bold">🪙</span>
+                        <span className="text-yellow-300 text-xs font-bold"><AnimatedNumber value={playerData.coins} /></span>
                     </div>
-                    
-                    <div className="ff-gem-box text-purple-400 !text-sm !py-1 !px-2 !pr-6">
-                        <span className="text-lg"><Gem size={18} /></span>
-                        <AnimatedNumber value={playerData.gems} />
-                        <button onClick={() => setIsTopUpModalOpen(true)} className="ff-topup-button" aria-label="Top up gems">+</button>
+                    {/* Gems */}
+                    <div className="flex items-center gap-1 bg-purple-900/40 border border-purple-500/40 rounded-lg px-2 py-1 relative">
+                        <span className="text-purple-400 text-sm font-bold">💎</span>
+                        <span className="text-purple-300 text-xs font-bold"><AnimatedNumber value={playerData.gems} /></span>
+                        <button onClick={() => setIsTopUpModalOpen(true)} className="absolute -top-1.5 -right-1.5 bg-purple-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow-lg hover:bg-purple-400 transition-colors">+</button>
                     </div>
 
-                    {isWeeklyActive && <div onClick={() => setMembershipModalInfo({ type: 'weekly' })} className="ff-membership-card glow-w text-base" title={`Weekly Pass Active. Expires: ${new Date(playerData.weeklyMembershipExpires!).toLocaleDateString()}`}>W</div>}
-                    {isMonthlyActive && <div onClick={() => setMembershipModalInfo({ type: 'monthly' })} className="ff-membership-card glow-m text-base" title={`Monthly Pass Active. Expires: ${new Date(playerData.monthlyMembershipExpires!).toLocaleDateString()}`}>M</div>}
-                    
-                    <div className="flex items-center gap-1 ml-1 bg-black/40 p-1 rounded-xl border border-white/10">
-                      <button onClick={handleToggleMailbox} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors relative group" aria-label="Mailbox">
-                          <MailIcon hasUnread={hasUnreadMail || hasUnreadGlobalNotifs} />
-                      </button>
-                      <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors" aria-label="Settings">
-                          <SettingsIcon />
-                      </button>
-                      <button onClick={() => auth.signOut()} className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors" aria-label="Logout">
-                          <LogoutIcon />
-                      </button>
+                    {isDailyClaimAvailable && (
+                        <button onClick={handleClaim} disabled={isClaiming} className="bg-green-600 text-white text-[9px] font-bold px-2 py-1 rounded-lg border border-green-400 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.3)]">{isClaiming ? <Spinner /> : '🎁'}</button>
+                    )}
+
+                    {/* Ping indicator in header */}
+                    <PingIndicator />
+
+                    <div className="flex items-center gap-0.5 ml-0.5 bg-black/50 p-1 rounded-lg border border-white/10">
+                        <button onClick={handleToggleMailbox} className="p-1 rounded hover:bg-white/10 transition-colors" aria-label="Mailbox">
+                            <MailIcon hasUnread={hasUnreadMail || hasUnreadGlobalNotifs} />
+                        </button>
+                        <button onClick={() => setIsSettingsOpen(true)} className="p-1 rounded hover:bg-white/10 transition-colors" aria-label="Settings">
+                            <SettingsIcon />
+                        </button>
+                        <button onClick={() => auth.signOut()} className="p-1 rounded hover:bg-red-500/20 text-red-400 transition-colors" aria-label="Logout">
+                            <LogoutIcon />
+                        </button>
                     </div>
                 </div>
             </header>
@@ -502,8 +502,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                                   </div>
                                 </div>
                               )}
-
-                              <PingIndicator />
                             </div>
                         </div>
                     </div>
@@ -523,7 +521,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             <h2 className="font-pixel text-lg sm:text-xl text-yellow-400 tracking-wider drop-shadow-sm">{activeTab.replace('_', ' ')}</h2>
                             <button onClick={() => setActiveTab('CHALLENGE')} className="text-2xl hover:text-yellow-400 transition-colors text-gray-400">&times;</button>
                         </div>
-                        <div className="flex-grow overflow-hidden flex flex-col p-1 sm:p-2 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+                        <div className="flex-grow overflow-y-auto flex flex-col p-1 sm:p-2 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
                             {renderPanelContent()}
                         </div>
                     </div>
