@@ -39,7 +39,7 @@ import { isWinterThemeActive } from '../utils/helpers';
 import { useContentConfig } from '../hooks/useContentConfig';
 import Snowfall from './common/Snowfall';
 import CustomRoomModal from './common/CustomRoomModal';
-import BirdIcon from './common/BirdIcon';
+import LottieBird from './common/LottieBird';
 import { ReferralModal } from './common/ReferralModal';
 import { LimitedEventBanner } from './common/LimitedEventBanner';
 import { applyReferralCode } from '../services/referralService';
@@ -399,16 +399,14 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                 {/* Central Content Area - Reduced Bird Scale and Padding */}
                 <div className="flex-grow flex flex-col gap-1 p-1 overflow-hidden relative">
                     <LimitedEventBanner onEventClick={(event) => toast.info(`${event.title}: ${event.description}`)} />
-                    <div className="flex-grow flex items-center justify-center bird-float pseudo-3d relative bird-idle">
+                     <div className="flex-grow flex items-center justify-center relative">
                         {equippedBird ? (
                             <div className="text-center group">
-                                <div className="pseudo-3d-bird-icon transform transition-transform duration-500 group-hover:scale-110">
-                                    <BirdIcon 
-                                        bird={equippedBird} 
-                                        className="icon !text-[6rem] md:!text-[10rem] lg:!text-[12rem]"
-                                        imgClassName="w-32 h-32 md:w-48 md:h-48 lg:w-64 lg:h-64 object-contain drop-shadow-[0_20px_20px_rgba(0,0,0,0.6)]"
-                                    />
-                                </div>
+                                <LottieBird
+                                    bird={equippedBird}
+                                    size="xl"
+                                    animated={true}
+                                />
                                 <h2 className="name !text-xl sm:!text-3xl mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{equippedBird.name}</h2>
                             </div>
                         ) : (

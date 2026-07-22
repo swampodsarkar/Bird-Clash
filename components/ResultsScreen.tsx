@@ -13,6 +13,7 @@ import {
 } from '../services/playerService';
 import * as clanWarService from '../services/clanWarService';
 import { Confetti } from './common/Confetti';
+import VictoryAnimation from './common/VictoryAnimation';
 import Button from './common/Button';
 import { useGameConfig } from '../hooks/useGameConfig';
 import { getRankInfo } from '../utils/helpers';
@@ -228,8 +229,9 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-center relative overflow-hidden p-4">
-      {result.outcome === 'win' && <Confetti />}
-      <div className="p-6 sm:p-8 bg-[#2c2c54]/90 backdrop-blur-sm border-2 border-black shadow-[8px_8px_0px_#000000] w-full max-w-md">
+      {result.outcome === 'win' && <><Confetti /><VictoryAnimation type="victory" /></>}
+      {result.outcome === 'loss' && <VictoryAnimation type="defeat" />}
+      <div className="p-6 sm:p-8 bg-[#2c2c54]/90 backdrop-blur-sm border-2 border-black shadow-[8px_8px_0px_#000000] w-full max-w-md z-10">
         <h1 className={`text-4xl sm:text-5xl font-bold mb-4 ${titleColor}`} style={{ textShadow: '2px 2px 0px #000' }}>{getTitle()}</h1>
         
         <div className="my-6 grid grid-cols-2 gap-4 text-lg">

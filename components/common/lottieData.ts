@@ -1,0 +1,33 @@
+export const BIRD_ANIMATIONS: Record<string, string> = {
+  B001: '/lottie/B001.json',
+  B002: '/lottie/B002.json',
+  B003: '/lottie/B003.json',
+  B004: '/lottie/B004.json',
+  B005: '/lottie/B005.json',
+  B006: '/lottie/B006.json',
+  B007: '/lottie/B007.json',
+  B010: '/lottie/B010.json',
+  B015: '/lottie/B015.json',
+  B017: '/lottie/B017.json',
+  B021: '/lottie/B021.json',
+  B023: '/lottie/B023.json',
+  B027: '/lottie/B027.json',
+  B028: '/lottie/B028.json',
+  B029: '/lottie/B029.json',
+  B046: '/lottie/B046.json',
+  B047: '/lottie/B047.json',
+  B048: '/lottie/B048.json',
+  B049: '/lottie/B049.json',
+  B051: '/lottie/B051.json',
+};
+
+export const EFFECT_ANIMATIONS = {
+  attack: '/lottie/attack.json',
+  shield: '/lottie/shield.json',
+  heal: '/lottie/heal.json',
+  ultimate: '/lottie/ultimate.json',
+  hit: '/lottie/hit.json',
+  victory: '/lottie/victory.json',
+  defeat: '/lottie/defeat.json',
+  confetti: '/lottie/confetti.json',
+};

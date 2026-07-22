@@ -13,6 +13,9 @@ import SettingsModal from './common/SettingsModal';
 import PlayerAvatar from './common/PlayerAvatar';
 import { useSettings } from '../hooks/useSettings';
 import { soundManager } from '../utils/sound';
+import LottieBird from './common/LottieBird';
+import { AttackEffect, ShieldEffect, HealEffect, UltimateEffect, HitEffect } from './common/LottieEffects';
+import VictoryAnimation from './common/VictoryAnimation';
 
 interface ReportModalProps {
     opponentName: string;
@@ -145,6 +148,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   const [damageNumbers, setDamageNumbers] = useState<{ amount: number; target: 'me' | 'opponent'; key: number }[]>([]);
   const [animationClasses, setAnimationClasses] = useState({ me: '', opponent: '', screen: '' });
   const [particles, setParticles] = useState<Particle[]>([]);
+  const [activeEffect, setActiveEffect] = useState<'attack' | 'shield' | 'heal' | 'ultimate' | 'hit' | null>(null);
   const [isEmotePanelOpen, setIsEmotePanelOpen] = useState(false);
   const [emoteCooldown, setEmoteCooldown] = useState(false);
   const [emoteDisplay, setEmoteDisplay] = useState<{ me: { emote: string; key: string } | null; opponent: { emote: string; key: string } | null }>({ me: null, opponent: null });
@@ -336,21 +340,25 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         setAnimationClasses({ me: 'anim-attack-me', opponent: 'anim-hit-reaction', screen: '' });
         addDamageNumber(opponentDamageTaken, 'opponent');
         spawnParticles('damage', 5);
+        setActiveEffect('attack');
         soundManager.play('attack');
     }
     if (myDamageTaken > 0) {
         setAnimationClasses({ me: 'anim-hit-reaction', opponent: 'anim-attack-opponent', screen: 'anim-screen-shake' });
         addDamageNumber(myDamageTaken, 'me');
         spawnParticles('damage', 3);
+        setActiveEffect('hit');
         soundManager.play('hit');
     }
 
     if (newMe.currentHealth > (prevHealthRef.current.me ?? newMe.currentHealth)) {
       spawnParticles('heal', 4);
+      setActiveEffect('heal');
     }
 
     if (opponent.activeEffects?.blocking && opponentDamageTaken === 0 && prevTurnRef.current !== gameState.turn) {
       spawnParticles('block', 6);
+      setActiveEffect('shield');
       soundManager.play('block');
     }
 
@@ -540,6 +548,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             currentData[opponentKey].currentHealth -= damage;
             currentData[meKey].damageDealt += damage;
             spawnParticles('ultimate', 8);
+            setActiveEffect('ultimate');
             soundManager.play('ultimate');
         } else if (ultimateType === 'FULL_HEAL') {
             currentData[meKey].currentHealth = currentData[meKey].selectedBird.maxHealth;
@@ -675,6 +684,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                     if (botUltimateType === 'MASSIVE_DAMAGE') {
                         damage = currentData[opponentKey].selectedBird.ultimateValue || 0;
                         spawnParticles('ultimate', 8);
+                        setActiveEffect('ultimate');
                     } else if (botUltimateType === 'FULL_HEAL') {
                         currentData[opponentKey].currentHealth = currentData[opponentKey].selectedBird.maxHealth;
                         damage = 0;
@@ -832,6 +842,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           <ParticleEffect key={p.id} particle={p} />
         ))}
 
+        {activeEffect === 'attack' && <AttackEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'shield' && <ShieldEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'heal' && <HealEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'ultimate' && <UltimateEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'hit' && <HitEffect show={true} onComplete={() => setActiveEffect(null)} />}
+
         <div className="flex items-center justify-around w-full h-full relative">
           {damageNumbers.map(dn => (
             <div key={dn.key} className={`absolute text-4xl sm:text-5xl font-bold text-red-500 pointer-events-none animate-damage-popup ${dn.target === 'me' ? 'left-[15%]' : 'right-[15%]'}`}>
@@ -842,7 +858,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           <div className={`relative ${animationClasses.opponent}`}>
             <div ref={el => { if (el) playerRefs.current.set(opponent.uid, el); }}>
               <EmoteBubble payload={emoteDisplay.opponent} />
-              <span className="text-6xl sm:text-8xl md:text-9xl transform -scale-x-100">{opponent.selectedBird.icon}</span>
+              <LottieBird bird={opponent.selectedBird} size="lg" animated={true} />
             </div>
           </div>
 
@@ -870,16 +886,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           <div className={`relative ${animationClasses.me}`}>
             <div ref={el => { if (el) playerRefs.current.set(me.uid, el); }}>
               <EmoteBubble payload={emoteDisplay.me} />
-              <span className="text-6xl sm:text-8xl md:text-9xl">{me.selectedBird.icon}</span>
+              <LottieBird bird={me.selectedBird} size="lg" animated={true} />
             </div>
           </div>
         </div>
 
         {gameOverState && (
           <div className="game-over-overlay">
-            {gameOverState === 'win' && <h1 className="game-over-text victory-text">VICTORY</h1>}
-            {gameOverState === 'loss' && <h1 className="game-over-text defeat-text">DEFEAT</h1>}
-            {gameOverState === 'draw' && <h1 className="game-over-text draw-text">DRAW</h1>}
+            {gameOverState === 'win' && (
+              <>
+                <VictoryAnimation type="victory" />
+                <h1 className="game-over-text victory-text z-50">VICTORY</h1>
+              </>
+            )}
+            {gameOverState === 'loss' && (
+              <>
+                <VictoryAnimation type="defeat" />
+                <h1 className="game-over-text defeat-text z-50">DEFEAT</h1>
+              </>
+            )}
+            {gameOverState === 'draw' && <h1 className="game-over-text draw-text z-50">DRAW</h1>}
           </div>
         )}
         <ReactionAnimation payload={reactionDisplay} playerRefs={playerRefs} />
