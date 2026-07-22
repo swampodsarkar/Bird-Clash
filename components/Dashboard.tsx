@@ -502,14 +502,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                                   </div>
                                 </div>
                               )}
-                              {!hasStarterPack && (
-                                <button
-                                  onClick={() => setActiveTab('STORE')}
-                                  className="text-[11px] font-bold px-3 py-1.5 rounded-full border-2 border-orange-400 bg-gradient-to-r from-orange-600/30 to-amber-600/30 text-orange-300 hover:from-orange-600/50 hover:to-amber-600/50 transition-all animate-pulse shadow-[0_0_10px_rgba(251,146,60,0.3)]"
-                                >
-                                  🎁 STARTER PACK
-                                </button>
-                              )}
+
                               <PingIndicator />
                             </div>
                         </div>

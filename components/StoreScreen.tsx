@@ -98,18 +98,18 @@ const StoreScreen: React.FC<StoreScreenProps> = ({ player }) => {
       updates[`users/${user.uid}/hasPurchasedStarterPack`] = true;
       updates[`users/${user.uid}/coins`] = firebase.database.ServerValue.increment(5000);
       updates[`users/${user.uid}/gems`] = firebase.database.ServerValue.increment(100);
-      const eagleDef = BIRD_DEFINITIONS['B005'];
-      if (eagleDef) {
-        updates[`users/${user.uid}/ownedBirds/B005`] = {
-          id: eagleDef.id, name: eagleDef.name, rarity: eagleDef.rarity,
-          skillDescription: eagleDef.skillDescription, skillPower: eagleDef.baseAttackPower,
-          level: 1, xp: 0, xpToNextLevel: eagleDef.baseXpToNextLevel, icon: eagleDef.icon,
-          maxHealth: eagleDef.baseHealth, powerLevel: 1, healthLevel: 1,
-          abilityType: eagleDef.abilityType, abilityValue: eagleDef.abilityValue,
-          abilityCooldown: eagleDef.abilityCooldown, abilityDescription: eagleDef.abilityDescription,
+      const normalBird = BIRD_DEFINITIONS['B001'];
+      if (normalBird) {
+        updates[`users/${user.uid}/ownedBirds/B001`] = {
+          id: normalBird.id, name: normalBird.name, rarity: normalBird.rarity,
+          skillDescription: normalBird.skillDescription, skillPower: normalBird.baseAttackPower,
+          level: 1, xp: 0, xpToNextLevel: normalBird.baseXpToNextLevel, icon: normalBird.icon,
+          maxHealth: normalBird.baseHealth, powerLevel: 1, healthLevel: 1,
+          abilityType: normalBird.abilityType, abilityValue: normalBird.abilityValue,
+          abilityCooldown: normalBird.abilityCooldown, abilityDescription: normalBird.abilityDescription,
         };
       }
-      updates[`users/${user.uid}/inventory/insects/I001`] = firebase.database.ServerValue.increment(50);
+      updates[`users/${user.uid}/inventory/insects/I001`] = firebase.database.ServerValue.increment(10);
       await rtdb.ref().update(updates);
       toast.success('🔥 Starter Pack Purchased! Check your inventory!');
     } catch (e: any) {
@@ -137,13 +137,13 @@ const StoreScreen: React.FC<StoreScreenProps> = ({ player }) => {
                 🔥 STARTER PACK
                 <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">LIMITED</span>
               </h3>
-              <p className="text-[10px] text-gray-300 mt-0.5">Epic Bird • 100 Gems • 5,000 Coins • 50 Insects</p>
+              <p className="text-[10px] text-gray-300 mt-0.5">Common Bird • 100 Gems • 5,000 Coins • 10 Insects</p>
               <div className="flex gap-2 mt-1">
                 {[
-                  { icon: '🦅', label: 'Eagle Eye' },
+                  { icon: '🐦', label: 'Tappy' },
                   { icon: '💎', label: '100 Gems' },
                   { icon: '💰', label: '5,000' },
-                  { icon: '🐛', label: 'x50' },
+                  { icon: '🐛', label: 'x10' },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-0.5 bg-black/40 px-1.5 py-0.5 rounded-full text-[9px]">
                     <span>{item.icon}</span>
