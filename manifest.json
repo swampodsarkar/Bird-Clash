@@ -1,0 +1,22 @@
+{
+  "short_name": "Bird Clash",
+  "name": "Bird Clash Fever",
+  "description": "A 1v1 PvP web game where players compete in a tapping duel. Collect and upgrade birds with unique skills, feed them insects, and battle for supremacy. Features real-time multiplayer with Firebase.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a0a14",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "theme_color": "#0a0a14"
+}
