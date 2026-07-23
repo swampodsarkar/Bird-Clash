@@ -444,14 +444,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
     const opponentDamageTaken = (prevHealthRef.current.opponent ?? newOpponent.currentHealth) - newOpponent.currentHealth;
 
     if (opponentDamageTaken > 0) {
-        setAnimationClasses({ me: 'anim-attack-me', opponent: 'anim-hit-reaction', screen: '' });
+        setAnimationClasses({ me: 'anim-attack-me', opponent: 'anim-hit-opponent', screen: '' });
         addDamageNumber(opponentDamageTaken, 'opponent');
         spawnParticles('damage', 5);
         setActiveEffect('attack');
         soundManager.play('attack');
     }
     if (myDamageTaken > 0) {
-        setAnimationClasses({ me: 'anim-hit-reaction', opponent: 'anim-attack-opponent', screen: 'anim-screen-shake' });
+        setAnimationClasses({ me: 'anim-hit-me', opponent: 'anim-attack-opponent', screen: 'anim-screen-shake' });
         addDamageNumber(myDamageTaken, 'me');
         spawnParticles('damage', 3);
         setActiveEffect('hit');
@@ -459,8 +459,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
     }
 
     if (newMe.currentHealth > (prevHealthRef.current.me ?? newMe.currentHealth)) {
+      setAnimationClasses({ me: 'anim-ability', opponent: '', screen: '' });
       spawnParticles('heal', 4);
       setActiveEffect('heal');
+    }
+
+    if (newOpponent.currentHealth > (prevHealthRef.current.opponent ?? newOpponent.currentHealth)) {
+      setAnimationClasses({ me: '', opponent: 'anim-ability', screen: '' });
+      spawnParticles('heal', 4);
     }
 
     if (opponent.activeEffects?.blocking && opponentDamageTaken === 0 && prevTurnRef.current !== gameState.turn) {
@@ -650,6 +656,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
     if (!isMyTurn || isSubmitting) return;
     setIsSubmitting(true);
     soundManager.play('button_click');
+    setAnimationClasses({ me: 'anim-block', opponent: '', screen: '' });
+    const clearAnim = () => setAnimationClasses({ me: '', opponent: '', screen: '' });
+    setTimeout(clearAnim, fastAnimationMode ? 300 : 500);
 
     const matchRef = rtdb.ref(`matches/${match.id}`);
     matchRef.transaction(currentData => {
@@ -681,6 +690,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   const handleUltimate = useCallback(() => {
     if (!isMyTurn || isSubmitting) return;
     soundManager.play('button_click');
+    setAnimationClasses({ me: 'anim-ultimate-me', opponent: '', screen: 'anim-screen-shake' });
+    const clearAnim = () => setAnimationClasses({ me: '', opponent: '', screen: '' });
+    setTimeout(clearAnim, fastAnimationMode ? 400 : 800);
 
     const birdDef = me?.selectedBird;
     if (!birdDef || !birdDef.ultimateType) return;
@@ -779,6 +791,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   const handleAbility = useCallback(() => {
     if (!isMyTurn || isSubmitting) return;
     soundManager.play('button_click');
+    setAnimationClasses({ me: 'anim-ability', opponent: '', screen: '' });
+    const clearAnim = () => setAnimationClasses({ me: '', opponent: '', screen: '' });
+    setTimeout(clearAnim, fastAnimationMode ? 300 : 600);
 
     const birdDef = me?.selectedBird;
     if (!birdDef || !birdDef.abilityType) return;
@@ -1128,13 +1143,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
         <div className="flex items-center justify-around w-full h-full relative">
           {damageNumbers.map(dn => (
-            <div key={dn.key} className={`absolute text-4xl sm:text-5xl font-bold text-red-500 pointer-events-none animate-damage-popup ${dn.target === 'me' ? 'left-[15%]' : 'right-[15%]'}`}>
+            <div key={dn.key} className={`absolute text-4xl sm:text-5xl font-bold pointer-events-none animate-damage-popup ${dn.target === 'me' ? 'text-red-500 left-[15%]' : 'text-red-500 right-[15%]'}`}>
               -{dn.amount}
             </div>
           ))}
 
           <div className={`relative ${animationClasses.opponent}`}>
-            <div ref={el => { if (el) playerRefs.current.set(opponent.uid, el); }}>
+            <div ref={el => { if (el) playerRefs.current.set(opponent.uid, el); }} className="bird-wrapper">
               <EmoteBubble payload={emoteDisplay.opponent} />
               <LottieBird bird={opponent.selectedBird} size="lg" animated={true} />
             </div>
@@ -1162,7 +1177,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           </div>
 
           <div className={`relative ${animationClasses.me}`}>
-            <div ref={el => { if (el) playerRefs.current.set(me.uid, el); }}>
+            <div ref={el => { if (el) playerRefs.current.set(me.uid, el); }} className="bird-wrapper">
               <EmoteBubble payload={emoteDisplay.me} />
               <LottieBird bird={me.selectedBird} size="lg" animated={true} />
             </div>
