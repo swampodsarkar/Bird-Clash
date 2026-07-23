@@ -47,20 +47,26 @@ export const createRoom = async (player: Player, roomType: 'normal' | 'esports')
 // Join an existing room
 export const joinRoom = async (player: Player, roomId: string): Promise<CustomRoom> => {
     const roomRef = roomsRef.child(roomId);
-    
+
+    // First check the room exists at all
+    const existingSnap = await roomRef.once('value');
+    if (!existingSnap.exists()) {
+        throw new Error("Room not found. Check the Room ID.");
+    }
+    const existingRoom = existingSnap.val() as CustomRoom;
+    if (existingRoom.status !== 'waiting') {
+        throw new Error("Room is closed or already has a guest.");
+    }
+    if (existingRoom.hostUid === player.uid) {
+        // Host rejoining their own room — just return it
+        return existingRoom;
+    }
+
+    // Atomically update guest fields + status
     const { committed, snapshot } = await roomRef.transaction(room => {
-        if (!room) {
-            // Room doesn't exist
-            return;
-        }
-        if (room.status !== 'waiting') {
-            // Room is full or already started
-            return;
-        }
-        if (room.hostUid === player.uid) {
-            // Host is rejoining, that's fine.
-            return room;
-        }
+        if (!room) return; // aborted
+        if (room.status !== 'waiting') return; // aborted
+        if (room.guestUid) return; // already has a guest
 
         room.guestUid = player.uid;
         room.guestDisplayName = player.displayName;
@@ -70,9 +76,9 @@ export const joinRoom = async (player: Player, roomId: string): Promise<CustomRo
     });
 
     if (!committed || !snapshot.exists()) {
-        throw new Error("Could not join room. It might be full, closed, or does not exist.");
+        throw new Error("Failed to join room. It may have been taken already.");
     }
-    
+
     // Set onDisconnect for the guest
     roomRef.child('guestUid').onDisconnect().set(null);
     roomRef.child('guestDisplayName').onDisconnect().set(null);
