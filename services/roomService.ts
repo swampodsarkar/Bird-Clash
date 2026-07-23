@@ -164,7 +164,7 @@ export const listenToRoom = (roomId: string, callback: (room: CustomRoom | null)
     return () => roomRef.off('value', listener);
 };
 
-// Get all waiting rooms (without passwords for security)
+// Get all waiting rooms
 export const listenToAllRooms = (callback: (rooms: CustomRoom[]) => void): (() => void) => {
     const listener = (snapshot: firebase.database.DataSnapshot) => {
         const rooms: CustomRoom[] = [];
@@ -173,10 +173,7 @@ export const listenToAllRooms = (callback: (rooms: CustomRoom[]) => void): (() =
                 const room = child.val() as CustomRoom;
                 room.id = child.key || room.id;
                 if (room.status === 'waiting') {
-                    // Strip password from the list for security
-                    const safeRoom = { ...room };
-                    delete safeRoom.password;
-                    rooms.push(safeRoom);
+                    rooms.push(room);
                 }
             });
         }
