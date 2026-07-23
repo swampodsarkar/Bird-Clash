@@ -58,6 +58,7 @@ interface DashboardProps {
     onStartSpectating: (matchId: string) => void;
     onStartMinigame: () => void;
     onEnterRoom: (room: CustomRoom) => void;
+    onOpenRoomBrowser: () => void;
 }
 
 const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
@@ -508,7 +509,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             
                             <div className="grid grid-cols-3 gap-2">
                                 <Button
-                                    onClick={() => setIsCustomRoomModalOpen(true)}
+                                    onClick={props.onOpenRoomBrowser}
                                     className="w-full !py-2 !text-xs !font-bold"
                                     variant="secondary"
                                 >

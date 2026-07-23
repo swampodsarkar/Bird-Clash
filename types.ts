@@ -402,6 +402,7 @@ export interface CustomRoom {
   status: 'waiting' | 'full';
   roomType: 'normal' | 'esports';
   matchId: string | null;
+  password?: string;
   createdAt: number;
 }
 

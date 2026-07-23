@@ -8,7 +8,7 @@ const roomsRef = rtdb.ref('custom_rooms');
 const invitesRef = rtdb.ref('room_invites');
 
 // Create a new room
-export const createRoom = async (player: Player, roomType: 'normal' | 'esports'): Promise<CustomRoom> => {
+export const createRoom = async (player: Player, roomType: 'normal' | 'esports', password?: string): Promise<CustomRoom> => {
     const cardType = roomType === 'esports' ? 'droneCustomCards' : 'normalCustomCards';
     if ((player[cardType] || 0) < 1) {
         throw new Error(`You need a ${roomType === 'normal' ? 'Normal' : 'Esports'} Card to create this room.`);
@@ -31,6 +31,7 @@ export const createRoom = async (player: Player, roomType: 'normal' | 'esports')
         matchId: null,
         createdAt: firebase.database.ServerValue.TIMESTAMP as number,
     };
+    if (password) newRoom.password = password;
 
     const updates: { [key: string]: any } = {};
     updates[`custom_rooms/${roomId}`] = newRoom;
@@ -45,10 +46,9 @@ export const createRoom = async (player: Player, roomType: 'normal' | 'esports')
 };
 
 // Join an existing room
-export const joinRoom = async (player: Player, roomId: string): Promise<CustomRoom> => {
+export const joinRoom = async (player: Player, roomId: string, password?: string): Promise<CustomRoom> => {
     const roomRef = roomsRef.child(roomId);
 
-    // Read the current room data
     const snap = await roomRef.once('value');
     if (!snap.exists()) {
         throw new Error("Room not found. Check the Room ID.");
@@ -63,8 +63,10 @@ export const joinRoom = async (player: Player, roomId: string): Promise<CustomRo
     if (room.guestUid) {
         throw new Error("Room already has a guest.");
     }
+    if (room.password && room.password !== password) {
+        throw new Error("Wrong password.");
+    }
 
-    // Directly update the room
     await roomRef.update({
         guestUid: player.uid,
         guestDisplayName: player.displayName,
@@ -72,13 +74,11 @@ export const joinRoom = async (player: Player, roomId: string): Promise<CustomRo
         status: 'full',
     });
 
-    // Set onDisconnect cleanup for the guest
     roomRef.child('guestUid').onDisconnect().set(null);
     roomRef.child('guestDisplayName').onDisconnect().set(null);
     roomRef.child('guestPhotoURL').onDisconnect().set(null);
     roomRef.child('status').onDisconnect().set('waiting');
 
-    // Return updated room
     const updatedSnap = await roomRef.once('value');
     return updatedSnap.val() as CustomRoom;
 };
@@ -157,6 +157,28 @@ export const listenToRoom = (roomId: string, callback: (room: CustomRoom | null)
     };
     roomRef.on('value', listener);
     return () => roomRef.off('value', listener);
+};
+
+// Get all waiting rooms (without passwords for security)
+export const listenToAllRooms = (callback: (rooms: CustomRoom[]) => void): (() => void) => {
+    const listener = (snapshot: firebase.database.DataSnapshot) => {
+        const rooms: CustomRoom[] = [];
+        if (snapshot.exists()) {
+            snapshot.forEach(child => {
+                const room = child.val() as CustomRoom;
+                room.id = child.key || room.id;
+                if (room.status === 'waiting') {
+                    // Strip password from the list for security
+                    const safeRoom = { ...room };
+                    delete safeRoom.password;
+                    rooms.push(safeRoom);
+                }
+            });
+        }
+        callback(rooms);
+    };
+    roomsRef.on('value', listener);
+    return () => roomsRef.off('value', listener);
 };
 
 // Invite a friend to a room

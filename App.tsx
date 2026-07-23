@@ -34,6 +34,7 @@ import TutorialModal from './components/common/TutorialModal';
 import DailyRewardModal from './components/common/DailyRewardModal';
 import Snowfall from './components/common/Snowfall';
 import RoomView from './components/common/RoomView';
+import RoomBrowser from './components/common/RoomBrowser';
 import RoomInviteNotificationModal from './components/common/RoomInviteNotificationModal';
 import MatchmakingScreen from './components/MatchmakingScreen';
 import SpectatorScreen from './components/SpectatorScreen';
@@ -45,7 +46,7 @@ import type { LoginStreak } from './types';
 
 
 
-type GameState = 'AUTH' | 'LOBBY' | 'MATCHMAKING' | 'IN_ROOM' | 'IN_GAME' | 'RESULTS' | 'SPECTATING' | 'MINIGAME';
+type GameState = 'AUTH' | 'LOBBY' | 'ROOM_BROWSER' | 'MATCHMAKING' | 'IN_ROOM' | 'IN_GAME' | 'RESULTS' | 'SPECTATING' | 'MINIGAME';
 
 const ViewportManager: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
@@ -430,6 +431,14 @@ const Game: React.FC = () => {
 
   const handleStartMatchmaking = useCallback(() => setGameState('MATCHMAKING'), []);
   
+  const handleOpenRoomBrowser = useCallback(() => {
+    setGameState('ROOM_BROWSER');
+  }, []);
+
+  const handleBackToLobby = useCallback(() => {
+    setGameState('LOBBY');
+  }, []);
+
   const handleEnterRoom = useCallback((room: CustomRoom) => {
     setCurrentRoom(room);
     setGameState('IN_ROOM');
@@ -585,6 +594,7 @@ const Game: React.FC = () => {
                 onStartSpectating={handleStartSpectating}
                 onStartMinigame={handleStartMinigame}
                 onEnterRoom={handleEnterRoom}
+                onOpenRoomBrowser={handleOpenRoomBrowser}
             />;
         }
         return <CenteredSpinner />;
@@ -596,6 +606,15 @@ const Game: React.FC = () => {
             foundMatch={foundMatchForVS}
             onMatchConfirmed={handleMatchFound}
           />
+        }
+        return <CenteredSpinner />;
+      case 'ROOM_BROWSER':
+        if (playerData) {
+            return <RoomBrowser
+                player={playerData}
+                onEnterRoom={handleEnterRoom}
+                onBack={handleBackToLobby}
+            />
         }
         return <CenteredSpinner />;
       case 'IN_ROOM':
