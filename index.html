@@ -52,6 +52,52 @@
         user-select: none;
         -webkit-user-select: none;
       }
+
+      body.p1-active {
+        background-image:
+          radial-gradient(ellipse at 20% 50%, rgba(79, 70, 229, 0.12) 0%, transparent 65%),
+          radial-gradient(ellipse at 30% 80%, rgba(34, 211, 238, 0.08) 0%, transparent 60%),
+          linear-gradient(135deg, #1e3a5f, #0d2137, #0a1929),
+          url('https://api.dicebear.com/7.x/pixel-art/svg?seed=battle-p1-background&background=%231e3a5f&shape=bird&hair=short');
+        background-size: cover, cover, cover, cover;
+        background-position: center, center, center, center;
+        background-repeat: no-repeat;
+        animation: background-pulse 20s ease-in-out infinite;
+      }
+
+      body.p2-active {
+        background-image:
+          radial-gradient(ellipse at 80% 50%, rgba(250, 204, 21, 0.12) 0%, transparent 65%),
+          radial-gradient(ellipse at 70% 20%, rgba(239, 68, 68, 0.08) 0%, transparent 60%),
+          linear-gradient(315deg, #5b21b6, #4c1574, #372963),
+          url('https://api.dicebear.com/7.x/pixel-art/svg?seed=battle-p2-background&background=%235b21b6&shape=bird&hair=spiky');
+        background-size: cover, cover, cover, cover;
+        background-position: center, center, center, center;
+        background-repeat: no-repeat;
+        animation: background-pulse-reverse 20s ease-in-out infinite;
+      }
+
+      body.battle-active {
+        animation: battle-background 5s linear infinite;
+      }
+
+      @keyframes background-pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+        100% { transform: scale(1); }
+      }
+
+      @keyframes background-pulse-reverse {
+        0% { transform: scale(1) rotate(0deg); }
+        50% { transform: scale(1.02) rotate(180deg); }
+        100% { transform: scale(1) rotate(360deg); }
+      }
+
+      @keyframes battle-background {
+        0% { filter: brightness(0.9); }
+        50% { filter: brightness(1.1) drop-shadow(0 0 20px rgba(255, 215, 0, 0.3)); }
+        100% { filter: brightness(0.9); }
+      }
       #root {
         width: 100%;
         height: 100%;

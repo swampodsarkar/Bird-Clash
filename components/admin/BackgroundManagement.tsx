@@ -26,7 +26,8 @@ const BackgroundManagement: React.FC = () => {
         setSaving(type);
         try {
             const url = type === 'lobby' ? lobbyBg : battleBg;
-            await bgRef.child(type).set(url);
+            const typeRef = bgRef.child(type);
+            await typeRef.set(url);
             toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} background updated!`);
         } catch (e: any) {
             toast.error(e.message);
