@@ -1,68 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import Lottie from 'lottie-react';
+import React, { useState } from 'react';
 
-interface Props {
+const LazyLottie = React.lazy(() => import('react-lottie-player'));
+
+interface LottieAnimationProps {
+  animationData?: object;
   path?: string;
-  url?: string;
-  width?: number | string;
-  height?: number | string;
   loop?: boolean;
-  autoplay?: boolean;
-  style?: React.CSSProperties;
+  play?: boolean;
+  speed?: number;
   className?: string;
+  style?: React.CSSProperties;
+  fallback?: React.ReactNode;
 }
 
-const LottieAnimation: React.FC<Props> = ({
+const LottieAnimation: React.FC<LottieAnimationProps> = ({
+  animationData,
   path,
-  url,
-  width = 200,
-  height = 200,
   loop = true,
-  autoplay = true,
-  style,
+  play = true,
+  speed = 1,
   className,
+  style,
+  fallback,
 }) => {
-  const [animationData, setAnimationData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  const sourceUrl = path 
-    ? (path.startsWith('http') ? path : `${window.location.origin}${path.startsWith('/') ? '' : '/'}${path}`)
-    : url;
+  if (!animationData && !path) {
+    return <>{fallback || null}</>;
+  }
 
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    if (!sourceUrl) { setLoading(false); return; }
-    fetch(sourceUrl)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed');
-        return res.json();
-      })
-      .then(data => {
-        if (mounted) { setAnimationData(data); setLoading(false); }
-      })
-      .catch(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
-  }, [sourceUrl]);
+  if (hasError) {
+    return <>{fallback || null}</>;
+  }
 
-  if (loading) {
+  if (!animationData && path) {
     return (
-      <div style={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }} className={className}>
-        <div style={{ width: 40, height: 40, border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#4ecca3', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-      </div>
+      <React.Suspense fallback={<>{fallback || null}</>}>
+        <LazyLottie
+          path={path}
+          loop={loop}
+          play={play}
+          speed={speed}
+          className={className}
+          style={style}
+          onError={() => setHasError(true)}
+        />
+      </React.Suspense>
     );
   }
 
-  if (!animationData) return null;
-
   return (
-    <Lottie
-      animationData={animationData}
-      loop={loop}
-      autoplay={autoplay}
-      style={{ width, height, ...style }}
-      className={className}
-    />
+    <React.Suspense fallback={<>{fallback || null}</>}>
+      <LazyLottie
+        animationData={animationData}
+        loop={loop}
+        play={play}
+        speed={speed}
+        className={className}
+        style={style}
+        onError={() => setHasError(true)}
+      />
+    </React.Suspense>
   );
 };
 
