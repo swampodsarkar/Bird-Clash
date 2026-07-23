@@ -110,6 +110,7 @@ const StoreScreen: React.FC<StoreScreenProps> = ({ player }) => {
         };
       }
       updates[`users/${user.uid}/inventory/insects/I001`] = firebase.database.ServerValue.increment(10);
+      updates[`users/${user.uid}/nameChangeCards`] = firebase.database.ServerValue.increment(1);
       await rtdb.ref().update(updates);
       toast.success('🔥 Starter Pack Purchased! Check your inventory!');
     } catch (e: any) {
@@ -137,13 +138,14 @@ const StoreScreen: React.FC<StoreScreenProps> = ({ player }) => {
                 🔥 STARTER PACK
                 <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">LIMITED</span>
               </h3>
-              <p className="text-[10px] text-gray-300 mt-0.5">Common Bird • 100 Gems • 5,000 Coins • 10 Insects</p>
+              <p className="text-[10px] text-gray-300 mt-0.5">Common Bird • 100 Gems • 5,000 Coins • 10 Insects • Name Change Card</p>
               <div className="flex gap-2 mt-1">
                 {[
                   { icon: '🐦', label: 'Tappy' },
                   { icon: '💎', label: '100 Gems' },
                   { icon: '💰', label: '5,000' },
                   { icon: '🐛', label: 'x10' },
+                  { icon: '🏷️', label: 'Name Card' },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-0.5 bg-black/40 px-1.5 py-0.5 rounded-full text-[9px]">
                     <span>{item.icon}</span>

@@ -158,7 +158,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
     const [isClaiming, setIsClaiming] = useState(false);
     const [membershipModalInfo, setMembershipModalInfo] = useState<{type: 'weekly' | 'monthly'} | null>(null);
-    const [isWinterverseModalOpen, setIsWinterverseModalOpen] = useState(false);
+    const [isSeasonalModalOpen, setIsSeasonalModalOpen] = useState(false);
     const [isEventsModalOpen, setIsEventsModalOpen] = useState(false);
     const musicStarted = useRef(false);
 
@@ -193,10 +193,9 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     }, []);
 
     useEffect(() => {
-        const hideModal = sessionStorage.getItem('hideWinterverseModal') === 'true';
+        const hideModal = sessionStorage.getItem('hideSeasonalEventModal') === 'true';
         if (!hideModal) {
-            // Add a small delay to make it feel less abrupt on login
-            setTimeout(() => setIsWinterverseModalOpen(true), 1000);
+            setTimeout(() => setIsSeasonalModalOpen(true), 1000);
         }
     }, []);
     
@@ -592,7 +591,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             <TopUpSelectionModal isOpen={isTopUpModalOpen} onClose={() => setIsTopUpModalOpen(false)} player={playerData} />
             {viewingProfileUid && <PublicProfileScreen uid={viewingProfileUid} onClose={() => setViewingProfileUid(null)} sender={playerData} />}
             <MembershipClaimModal isOpen={!!membershipModalInfo} onClose={() => setMembershipModalInfo(null)} player={playerData} type={membershipModalInfo?.type || 'weekly'}/>
-            <SeasonalEventModal isOpen={isWinterverseModalOpen} onClose={() => setIsWinterverseModalOpen(false)} />
+            <SeasonalEventModal isOpen={isSeasonalModalOpen} onClose={() => setIsSeasonalModalOpen(false)} />
             <EventsModal isOpen={isEventsModalOpen} onClose={() => setIsEventsModalOpen(false)} player={playerData} />
             <CustomRoomModal 
                 isOpen={isCustomRoomModalOpen} 

@@ -17,10 +17,36 @@ const GameSettings: React.FC = () => {
     const [eventDesc, setEventDesc] = useState('');
     const [loading, setLoading] = useState(true);
     const [lobbyMusicUrl, setLobbyMusicUrl] = useState('');
+    const [seasonalTitle, setSeasonalTitle] = useState('');
+    const [seasonalDesc, setSeasonalDesc] = useState('');
+    const [seasonalIcon, setSeasonalIcon] = useState('🎉');
+    const [seasonalEndDate, setSeasonalEndDate] = useState('');
+    const [seasonalGradFrom, setSeasonalGradFrom] = useState('#1e3a5f');
+    const [seasonalGradTo, setSeasonalGradTo] = useState('#0d2137');
+    const [seasonalBorder, setSeasonalBorder] = useState('#3b82f6');
+    const [seasonalActive, setSeasonalActive] = useState(false);
 
     useEffect(() => {
         setLobbyMusicUrl(gameConfig.lobbyMusicUrl);
     }, [gameConfig.lobbyMusicUrl]);
+
+    useEffect(() => {
+        const seasonalRef = rtdb.ref('gameConfig/seasonalEvent');
+        seasonalRef.on('value', snapshot => {
+            if (snapshot.exists()) {
+                const val = snapshot.val();
+                setSeasonalTitle(val.title || '');
+                setSeasonalDesc(val.description || '');
+                setSeasonalIcon(val.icon || '🎉');
+                setSeasonalEndDate(val.endDate ? new Date(val.endDate).toISOString().slice(0, 16) : '');
+                setSeasonalGradFrom(val.gradientFrom || '#1e3a5f');
+                setSeasonalGradTo(val.gradientTo || '#0d2137');
+                setSeasonalBorder(val.borderColor || '#3b82f6');
+                setSeasonalActive(val.active || false);
+            }
+        });
+        return () => seasonalRef.off('value');
+    }, []);
 
     useEffect(() => {
         const maintenanceRef = rtdb.ref('status/maintenance');
@@ -158,6 +184,25 @@ const GameSettings: React.FC = () => {
         }
     }
 
+    const handleSaveSeasonalEvent = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await rtdb.ref('gameConfig/seasonalEvent').set({
+                title: seasonalTitle,
+                description: seasonalDesc,
+                icon: seasonalIcon,
+                endDate: new Date(seasonalEndDate).toISOString(),
+                gradientFrom: seasonalGradFrom,
+                gradientTo: seasonalGradTo,
+                borderColor: seasonalBorder,
+                active: seasonalActive,
+            });
+            toast.success('Seasonal event updated!');
+        } catch (err: any) {
+            toast.error(err.message);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div className="p-6 bg-[#2c2c54] border-2 border-black shadow-[4px_4px_0px_#000000] rounded-lg">
@@ -202,6 +247,44 @@ const GameSettings: React.FC = () => {
                 <form onSubmit={handleSendNotification} className="flex gap-4">
                     <input type="text" value={notification} onChange={e => setNotification(e.target.value)} placeholder="Notification text..." className="pixel-input flex-grow" />
                     <Button type="submit">Send</Button>
+                </form>
+            </div>
+
+            <div className="p-6 bg-[#2c2c54] border-2 border-black shadow-[4px_4px_0px_#000000] rounded-lg">
+                <h2 className="text-lg font-semibold mb-4">Seasonal Event Popup</h2>
+                <form onSubmit={handleSaveSeasonalEvent} className="space-y-3 text-sm">
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="text" value={seasonalTitle} onChange={e => setSeasonalTitle(e.target.value)} placeholder="Title (e.g. Winterverse)" className="pixel-input" />
+                        <input type="text" value={seasonalIcon} onChange={e => setSeasonalIcon(e.target.value)} placeholder="Icon (emoji)" className="pixel-input" />
+                    </div>
+                    <textarea value={seasonalDesc} onChange={e => setSeasonalDesc(e.target.value)} placeholder="Description" className="pixel-input" rows={2} />
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs text-gray-400 block mb-1">End Date/Time</label>
+                            <input type="datetime-local" value={seasonalEndDate} onChange={e => setSeasonalEndDate(e.target.value)} className="pixel-input w-full" />
+                        </div>
+                        <div className="flex items-end gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={seasonalActive} onChange={e => setSeasonalActive(e.target.checked)} className="w-4 h-4" />
+                                <span>Active</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <div>
+                            <label className="text-xs text-gray-400 block mb-1">Gradient From</label>
+                            <input type="color" value={seasonalGradFrom} onChange={e => setSeasonalGradFrom(e.target.value)} className="w-full h-8 cursor-pointer" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 block mb-1">Gradient To</label>
+                            <input type="color" value={seasonalGradTo} onChange={e => setSeasonalGradTo(e.target.value)} className="w-full h-8 cursor-pointer" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 block mb-1">Border Color</label>
+                            <input type="color" value={seasonalBorder} onChange={e => setSeasonalBorder(e.target.value)} className="w-full h-8 cursor-pointer" />
+                        </div>
+                    </div>
+                    <Button type="submit">Save Seasonal Event</Button>
                 </form>
             </div>
             
