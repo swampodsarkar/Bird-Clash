@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { Player, CustomRoom, Friend } from '../../types';
+import React, { useState, useEffect } from 'react';
+import type { Player, CustomRoom, Friend, RoomSpectator } from '../../types';
 import Button from './Button';
 import { Spinner } from './Spinner';
 import PlayerAvatar from './PlayerAvatar';
@@ -18,7 +18,7 @@ const InviteFriendModal: React.FC<{ player: Player, room: CustomRoom, onClose: (
     const [invitingUid, setInvitingUid] = useState<string|null>(null);
     const [loadingFriends, setLoadingFriends] = useState(true);
 
-    React.useEffect(() => {
+    useEffect(() => {
         const unsub = listenToFriends(player.uid, (allFriends) => {
             setFriends(allFriends.filter(f => f.status === 'friends'));
             setLoadingFriends(false);
@@ -62,9 +62,15 @@ const RoomView: React.FC<RoomViewProps> = ({ room, player, onLeave }) => {
     const [loading, setLoading] = useState(false);
     const [swappingUid, setSwappingUid] = useState<string | null>(null);
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+    const [spectators, setSpectators] = useState<RoomSpectator[]>([]);
     const isHost = player.uid === room.hostUid;
     const isPlayer = player.uid === room.hostUid || player.uid === room.guestUid;
-    const spectators = room.spectators || [];
+    const isSpectator = !isPlayer;
+
+    useEffect(() => {
+        const unsub = roomService.listenToSpectators(room.id, setSpectators);
+        return unsub;
+    }, [room.id]);
 
     const handleStart = async () => {
         setLoading(true);
@@ -109,12 +115,16 @@ const RoomView: React.FC<RoomViewProps> = ({ room, player, onLeave }) => {
                 <div className="text-center">
                     <p className="text-3xl mb-2">📺</p>
                     <p className="text-yellow-400 font-bold text-lg">Match In Progress</p>
-                    <p className="text-gray-400 text-sm">The battle has started. Use Spectator mode to watch.</p>
+                    <p className="text-gray-400 text-sm">
+                        {isSpectator ? 'You are spectating. The battle is live!' : 'The battle has started.'}
+                    </p>
                 </div>
                 <Button onClick={onLeave} variant="danger">Leave</Button>
             </div>
         );
     }
+
+    const spectatorList = spectators.filter(s => s.uid !== room.hostUid && s.uid !== room.guestUid);
 
     return (
         <div className="w-full h-full flex flex-col items-center p-4 space-y-4 overflow-y-auto">
@@ -129,30 +139,22 @@ const RoomView: React.FC<RoomViewProps> = ({ room, player, onLeave }) => {
                     <PlayerAvatar photoURL={room.hostPhotoURL} uid={room.hostUid} sizeClassName="w-20 h-20 mx-auto" imgClassName="border-2 border-black"/>
                     <p className="font-bold">{room.hostDisplayName}</p>
                     <p className="text-xs text-blue-300">(Host)</p>
-                    {isHost && (
-                        <div className="space-y-1 mt-2">
-                            {spectators.filter(s => s.uid !== room.hostUid).map(s => (
-                                <button key={s.uid} onClick={() => handleSwap(s.uid, room.hostUid)} disabled={swappingUid === s.uid} className="text-[10px] bg-yellow-600 hover:bg-yellow-700 px-2 py-0.5 rounded w-full">
-                                    {swappingUid === s.uid ? <Spinner/> : `Swap with ${s.displayName}`}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                    {isHost && spectatorList.map(s => (
+                        <button key={s.uid} onClick={() => handleSwap(s.uid, room.hostUid)} disabled={swappingUid === s.uid} className="text-[10px] bg-yellow-600 hover:bg-yellow-700 px-2 py-0.5 rounded w-full">
+                            {swappingUid === s.uid ? <Spinner/> : `Swap with ${s.displayName}`}
+                        </button>
+                    ))}
                 </div>
                 <div className={`p-4 ${room.guestUid ? 'bg-green-900/80 border-2 border-green-400' : 'bg-gray-800/80 border-2 border-gray-600'} text-center space-y-2 flex flex-col justify-center items-center`}>
                     {room.guestUid ? (
                         <>
                             <PlayerAvatar photoURL={room.guestPhotoURL} uid={room.guestUid} sizeClassName="w-20 h-20 mx-auto" imgClassName="border-2 border-black"/>
                             <p className="font-bold">{room.guestDisplayName}</p>
-                            {isHost && (
-                                <div className="space-y-1 mt-2">
-                                    {spectators.filter(s => s.uid !== room.guestUid).map(s => (
-                                        <button key={s.uid} onClick={() => handleSwap(s.uid, room.guestUid)} disabled={swappingUid === s.uid} className="text-[10px] bg-yellow-600 hover:bg-yellow-700 px-2 py-0.5 rounded w-full">
-                                            {swappingUid === s.uid ? <Spinner/> : `Swap with ${s.displayName}`}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                            {isHost && spectatorList.map(s => (
+                                <button key={s.uid} onClick={() => handleSwap(s.uid, room.guestUid)} disabled={swappingUid === s.uid} className="text-[10px] bg-yellow-600 hover:bg-yellow-700 px-2 py-0.5 rounded w-full">
+                                    {swappingUid === s.uid ? <Spinner/> : `Swap with ${s.displayName}`}
+                                </button>
+                            ))}
                         </>
                     ) : (
                         <>
@@ -164,11 +166,11 @@ const RoomView: React.FC<RoomViewProps> = ({ room, player, onLeave }) => {
             </div>
 
             {/* Spectators */}
-            {spectators.length > 0 && (
+            {spectatorList.length > 0 && (
                 <div className="w-full max-w-lg">
-                    <p className="text-sm text-gray-400 mb-2">Spectators ({spectators.length})</p>
+                    <p className="text-sm text-gray-400 mb-2">Spectators ({spectatorList.length})</p>
                     <div className="space-y-1">
-                        {spectators.filter(s => s.uid !== room.hostUid && s.uid !== room.guestUid).map(s => (
+                        {spectatorList.map(s => (
                             <div key={s.uid} className="flex items-center justify-between bg-gray-900 border-2 border-black p-2 rounded">
                                 <div className="flex items-center gap-2">
                                     <PlayerAvatar photoURL={s.photoURL} uid={s.uid} sizeClassName="w-8 h-8" />
@@ -192,7 +194,7 @@ const RoomView: React.FC<RoomViewProps> = ({ room, player, onLeave }) => {
                         {loading ? <Spinner/> : "Start Match"}
                     </Button>
                 )}
-                {!isPlayer && (
+                {isSpectator && room.status === 'full' && (
                     <p className="text-center text-yellow-400 text-sm p-3">You are spectating. Wait for the host to start.</p>
                 )}
                 {isPlayer && !isHost && room.status === 'full' && (

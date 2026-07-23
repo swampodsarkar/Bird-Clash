@@ -88,9 +88,9 @@ const RoomBrowser: React.FC<RoomBrowserProps> = ({ player, onEnterRoom, onBack }
   const handleJoinAsSpectator = async (room: CustomRoom) => {
     setLoading(true);
     try {
-      const joined = await roomService.joinAsSpectator(player, room.id);
+      await roomService.joinAsSpectator(player, room.id);
       toast.success('Joined as spectator!');
-      onEnterRoom(joined);
+      onEnterRoom(room);
     } catch (e: any) {
       toast.error(e.message);
     } finally {

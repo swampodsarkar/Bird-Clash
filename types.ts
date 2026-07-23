@@ -410,7 +410,6 @@ export interface CustomRoom {
   matchId: string | null;
   password?: string;
   createdAt: number;
-  spectators?: RoomSpectator[];
 }
 
 export interface Friend {

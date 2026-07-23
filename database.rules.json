@@ -193,6 +193,16 @@
       }
     },
 
+    "room_spectators": {
+      "$roomId": {
+        ".read": "auth != null",
+        "$uid": {
+          // Users can write their own spectator entry; host can delete any
+          ".write": "auth != null && (auth.uid === $uid || root.child('custom_rooms').child($roomId).child('hostUid').val() === auth.uid)"
+        }
+      }
+    },
+
     "status": {
       "maintenance": {
         ".read": "auth != null",

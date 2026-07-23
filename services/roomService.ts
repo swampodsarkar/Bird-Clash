@@ -2,10 +2,10 @@ import { rtdb } from './firebase';
 import firebase from 'firebase/compat/app';
 import type { Player, CustomRoom, RoomInvite, Match, RoomSpectator } from '../types';
 import { getPlayerEquippedBird } from './gameService';
-import { toast } from 'react-toastify';
 
 const roomsRef = rtdb.ref('custom_rooms');
 const invitesRef = rtdb.ref('room_invites');
+const spectatorsRef = rtdb.ref('room_spectators');
 
 // Create a new room
 export const createRoom = async (player: Player, roomType: 'normal' | 'esports', password?: string): Promise<CustomRoom> => {
@@ -39,7 +39,6 @@ export const createRoom = async (player: Player, roomType: 'normal' | 'esports',
 
     await rtdb.ref().update(updates);
     
-    // Set onDisconnect for the host
     roomsRef.child(roomId).onDisconnect().remove();
 
     return newRoom;
@@ -90,37 +89,41 @@ export const leaveRoom = async (player: Player, roomId: string): Promise<void> =
     if (!roomSnapshot.exists()) return;
 
     const room = roomSnapshot.val() as CustomRoom;
-    const spectators = room.spectators || [];
+
+    // Also clean up spectator entry if any
+    spectatorsRef.child(roomId).child(player.uid).remove().catch(() => {});
 
     if (player.uid === room.hostUid) {
-        // Host leaves, room is deleted
         await roomRef.remove();
+        // Clean up all spectators for this room
+        spectatorsRef.child(roomId).remove().catch(() => {});
     } else if (player.uid === room.guestUid) {
-        // Guest leaves — promote first spectator or set waiting
-        const nextSpec = spectators.length > 0 ? spectators[0] : null;
-        const remainingSpectators = spectators.filter(s => s.uid !== (nextSpec?.uid || ''));
+        // Promote first spectator or set waiting
+        const specSnap = await spectatorsRef.child(roomId).once('value');
+        const specs: RoomSpectator[] = [];
+        if (specSnap.exists()) {
+            specSnap.forEach(child => {
+                specs.push(child.val());
+            });
+        }
+        const nextSpec = specs.length > 0 ? specs[0] : null;
         if (nextSpec) {
             await roomRef.update({
                 guestUid: nextSpec.uid,
                 guestDisplayName: nextSpec.displayName,
                 guestPhotoURL: nextSpec.photoURL,
                 status: 'full',
-                spectators: remainingSpectators,
             });
+            // Remove promoted spectator from list
+            await spectatorsRef.child(roomId).child(nextSpec.uid).remove();
         } else {
             await roomRef.update({
                 guestUid: null,
                 guestDisplayName: null,
                 guestPhotoURL: null,
                 status: 'waiting',
-                spectators: [],
             });
         }
-    } else if (spectators.some(s => s.uid === player.uid)) {
-        // Spectator leaves — remove from list
-        await roomRef.update({
-            spectators: spectators.filter(s => s.uid !== player.uid),
-        });
     }
 };
 
@@ -144,7 +147,6 @@ export const startMatch = async (room: CustomRoom): Promise<void> => {
     const guestBird = getPlayerEquippedBird(guestPlayer);
 
     const matchId = `match_custom_${room.id}`;
-    const spectatorUids = (room.spectators || []).map(s => s.uid);
     const newMatch: Match = {
         id: matchId,
         player1: { uid: hostPlayer.uid, displayName: hostPlayer.displayName, photoURL: hostPlayer.photoURL, damageDealt: 0, rankPoints: hostPlayer.rankPoints, clanId: hostPlayer.clanId || null, selectedBird: hostBird, currentHealth: hostBird.maxHealth, activeBadge: hostPlayer.activeBadge || null, equippedEmotes: hostPlayer.equippedEmotes || [], abilityCooldownLeft: 0, abilityUsesLeft: 2, wins: 0, activeEffects: {}, healUsesLeft: 2 },
@@ -166,39 +168,30 @@ export const startMatch = async (room: CustomRoom): Promise<void> => {
     updates[`custom_rooms/${room.id}/matchId`] = matchId;
     updates[`custom_rooms/${room.id}/status`] = 'in_game';
 
-    // Save spectator UIDs on match for read access
-    if (spectatorUids.length > 0) {
-        updates[`matches/${matchId}/spectatorUids`] = spectatorUids;
-    }
-
     await rtdb.ref().update(updates);
 };
 
-// Join a room as spectator (when room is full)
-export const joinAsSpectator = async (player: Player, roomId: string): Promise<CustomRoom> => {
-    const roomRef = roomsRef.child(roomId);
-    const snap = await roomRef.once('value');
-    if (!snap.exists()) throw new Error("Room not found.");
-    const room = snap.val() as CustomRoom;
-    if (room.status === 'waiting') {
-        // Room still has space — join as player instead
-        return joinRoom(player, roomId);
-    }
+// --- Spectator functions (stored in room_spectators/{roomId}/{uid}) ---
+
+// Join as spectator (anyone can write their own UID to room_spectators)
+export const joinAsSpectator = async (player: Player, roomId: string): Promise<void> => {
+    const roomSnap = await roomsRef.child(roomId).once('value');
+    if (!roomSnap.exists()) throw new Error("Room not found.");
+    const room = roomSnap.val() as CustomRoom;
     if (room.hostUid === player.uid || room.guestUid === player.uid) {
-        return room; // Already a player
+        return; // Already a player
     }
-    const spectators = room.spectators || [];
-    if (spectators.some(s => s.uid === player.uid)) {
-        return room; // Already spectating
-    }
-    const newSpec: RoomSpectator = {
+    const specData: RoomSpectator = {
         uid: player.uid,
         displayName: player.displayName || 'Spectator',
         photoURL: player.photoURL,
     };
-    spectators.push(newSpec);
-    await roomRef.update({ spectators });
-    return { ...room, spectators };
+    await spectatorsRef.child(roomId).child(player.uid).set(specData);
+};
+
+// Leave as spectator
+export const leaveAsSpectator = async (playerUid: string, roomId: string): Promise<void> => {
+    await spectatorsRef.child(roomId).child(playerUid).remove();
 };
 
 // Host swaps a player with a spectator
@@ -210,50 +203,70 @@ export const swapPlayer = async (hostUid: string, roomId: string, currentPlayerU
     if (room.hostUid !== hostUid) throw new Error("Only the host can swap players.");
     if (room.status === 'in_game') throw new Error("Match already started.");
 
-    const spectators = room.spectators || [];
-    const spec = spectators.find(s => s.uid === spectatorUid);
-    if (!spec) throw new Error("Spectator not found.");
-
-    const remainingSpectators = spectators.filter(s => s.uid !== spectatorUid);
+    const specSnap = await spectatorsRef.child(roomId).child(spectatorUid).once('value');
+    if (!specSnap.exists()) throw new Error("Spectator not found.");
+    const spec = specSnap.val() as RoomSpectator;
 
     if (currentPlayerUid === room.hostUid) {
-        // Host swaps themselves out — swap host with spectator
         const updates: any = {
             hostUid: spec.uid,
             hostDisplayName: spec.displayName,
             hostPhotoURL: spec.photoURL,
-            spectators: [...remainingSpectators, { uid: hostUid, displayName: room.hostDisplayName, photoURL: room.hostPhotoURL }],
         };
         await roomRef.update(updates);
+        // Old host becomes spectator
+        await spectatorsRef.child(roomId).child(hostUid).set({
+            uid: hostUid, displayName: room.hostDisplayName, photoURL: room.hostPhotoURL,
+        });
     } else if (currentPlayerUid === room.guestUid) {
-        // Guest swapped with spectator
         const updates: any = {
             guestUid: spec.uid,
             guestDisplayName: spec.displayName,
             guestPhotoURL: spec.photoURL,
-            spectators: [...remainingSpectators, { uid: currentPlayerUid, displayName: room.guestDisplayName, photoURL: room.guestPhotoURL }],
         };
         await roomRef.update(updates);
+        // Old guest becomes spectator
+        if (room.guestDisplayName) {
+            await spectatorsRef.child(roomId).child(currentPlayerUid).set({
+                uid: currentPlayerUid, displayName: room.guestDisplayName, photoURL: room.guestPhotoURL,
+            });
+        }
     } else {
         throw new Error("Player not found in room.");
     }
+    // Remove promoted spectator
+    await spectatorsRef.child(roomId).child(spectatorUid).remove();
 };
 
 // Host kicks a spectator
 export const kickSpectator = async (hostUid: string, roomId: string, spectatorUid: string): Promise<void> => {
-    const roomRef = roomsRef.child(roomId);
-    const snap = await roomRef.once('value');
+    const snap = await roomsRef.child(roomId).once('value');
     if (!snap.exists()) throw new Error("Room not found.");
     const room = snap.val() as CustomRoom;
     if (room.hostUid !== hostUid) throw new Error("Only the host can kick spectators.");
-    const spectators = (room.spectators || []).filter(s => s.uid !== spectatorUid);
-    await roomRef.update({ spectators });
+    await spectatorsRef.child(roomId).child(spectatorUid).remove();
+};
+
+// Listen to spectators for a room
+export const listenToSpectators = (roomId: string, callback: (spectators: RoomSpectator[]) => void): (() => void) => {
+    const ref = spectatorsRef.child(roomId);
+    const listener = (snapshot: firebase.database.DataSnapshot) => {
+        const list: RoomSpectator[] = [];
+        if (snapshot.exists()) {
+            snapshot.forEach(child => {
+                list.push(child.val() as RoomSpectator);
+            });
+        }
+        callback(list);
+    };
+    ref.on('value', listener);
+    return () => ref.off('value', listener);
 };
 
 // Listen to room changes
-// Delete a room unconditionally (used for cleanup after match ends)
 export const deleteRoom = async (roomId: string): Promise<void> => {
     await roomsRef.child(roomId).remove();
+    await spectatorsRef.child(roomId).remove().catch(() => {});
 };
 
 export const listenToRoom = (roomId: string, callback: (room: CustomRoom | null) => void): (() => void) => {
@@ -265,7 +278,7 @@ export const listenToRoom = (roomId: string, callback: (room: CustomRoom | null)
     return () => roomRef.off('value', listener);
 };
 
-// Get all available rooms (waiting or full — so spectators can find full rooms)
+// Get all available rooms
 export const listenToAllRooms = (callback: (rooms: CustomRoom[]) => void): (() => void) => {
     const listener = (snapshot: firebase.database.DataSnapshot) => {
         const rooms: CustomRoom[] = [];
@@ -292,11 +305,9 @@ export const inviteToRoom = async (fromPlayer: Player, toPlayerUid: string, room
         photoURL: fromPlayer.photoURL || '',
         activeBadge: fromPlayer.activeBadge,
     };
-    // Send a temporary invite that auto-deletes after 30 seconds
     const inviteRef = invitesRef.child(toPlayerUid);
     await inviteRef.set(invite);
     setTimeout(() => {
-        // Only remove if the invite is still the same one we sent
         inviteRef.once('value', snapshot => {
             if (snapshot.exists() && snapshot.val().roomId === roomId) {
                 inviteRef.remove();
