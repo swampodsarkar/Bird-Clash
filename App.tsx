@@ -469,6 +469,11 @@ const Game: React.FC = () => {
   
   const handleGameOver = useCallback((result: MatchResult, match: Match) => {
     if(user) updateUserMatchStatus(user.uid, null);
+    // Clean up custom room from Firebase after match ends
+    if (match.id.startsWith('match_custom_')) {
+      const roomId = match.id.replace('match_custom_', '');
+      roomService.deleteRoom(roomId);
+    }
     setMatchResult({ result, match });
     setGameState('RESULTS');
   }, [user]);

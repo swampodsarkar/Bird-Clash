@@ -150,6 +150,11 @@ export const startMatch = async (room: CustomRoom): Promise<void> => {
 };
 
 // Listen to room changes
+// Delete a room unconditionally (used for cleanup after match ends)
+export const deleteRoom = async (roomId: string): Promise<void> => {
+    await roomsRef.child(roomId).remove();
+};
+
 export const listenToRoom = (roomId: string, callback: (room: CustomRoom | null) => void): (() => void) => {
     const roomRef = roomsRef.child(roomId);
     const listener = (snapshot: firebase.database.DataSnapshot) => {
