@@ -987,30 +987,52 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
                 let damage = currentData[opponentKey].selectedBird.skillPower;
 
-                // --- Critical Hit (15% chance for 2x damage) ---
-                let isCritical = false;
-                if (Math.random() < 0.15) {
-                    damage *= 2;
-                    isCritical = true;
-                }
-
-                // --- Perfect Meter: Super Precise Power (3x damage) ---
-                let isSuperPrecise = false;
-                if ((currentData[opponentKey].perfectMeter || 0) >= 100) {
-                    damage *= 3;
-                    isSuperPrecise = true;
-                    currentData[opponentKey].perfectMeter = 0;
-                    currentData.log.push(`${currentData[opponentKey].displayName} unleashes SUPER PRECISE POWER!`);
-                }
-
-                // --- Time-based Damage Multiplier ---
-                let timeMultiplier = 1;
-                if (currentData.roundTimerEndTime) {
-                    const elapsed = Date.now() - (currentData.roundTimerEndTime - 60000);
-                    if (elapsed >= 45000) timeMultiplier = 3;      // last 15s: 3x
-                    else if (elapsed >= 30000) timeMultiplier = 2; // 30-45s: 2x
-                }
-                damage *= timeMultiplier;
+              // --- Critical Hit (30% chance for 2x damage) ---
+                 let isCritical = false;
+                 if (Math.random() < 0.30) {
+                     damage *= 2;
+                     isCritical = true;
+                 }
+                 
+                 // --- Perfect Meter: Super Precise Power (4x damage) ---
+                 let isSuperPrecise = false;
+                 if ((currentData[opponentKey].perfectMeter || 0) >= 100) {
+                     damage *= 4;
+                     isSuperPrecise = true;
+                     currentData[opponentKey].perfectMeter = 0;
+                     currentData.log.push(`${currentData[opponentKey].displayName} unleashes SUPER PRECISE POWER!`);
+                 }
+                 
+                 // --- Time-based Damage Multiplier ---
+                 let timeMultiplier = 1;
+                 if (currentData.roundTimerEndTime) {
+                     const elapsed = Date.now() - (currentData.roundTimerEndTime - 60000);
+                     if (elapsed >= 45000) timeMultiplier = 4;      // last 15s: 4x (ultra aggressive)
+                     else if (elapsed >= 30000) timeMultiplier = 3; // 30-45s: 3x (strong)
+                     else if (elapsed >= 15000) timeMultiplier = 2; // 15-30s: 2x
+                 }
+                 damage *= timeMultiplier;
+                 
+                 // --- Bot Strategy: Conditional Ultimate Usage ---
+                 const roundTimeRemaining = currentData.roundTimerEndTime ? Math.max(0, currentData.roundTimerEndTime - Date.now()) : 0;
+                 if (roundTimeRemaining <= 20000 && botUltimateType === 'MASSIVE_DAMAGE') {
+                     if (!usedUltimate) {
+                         usedUltimate = true;
+                         const timeLabel = timeMultiplier > 1 ? ` ⚡${timeMultiplier}x FINAL PUSH BONUS` : '';
+                         currentData.log.push(`Bot unleashes ULTIMATE OF FATE: ${currentData[opponentKey].selectedBird.ultimateDescription}${timeLabel} `);
+                         damage = (currentData[opponentKey].selectedBird.ultimateValue || 0) * timeMultiplier;
+                         spawnParticles('ultimate', 8);
+                         setActiveEffect('ultimate');
+                     }
+                 } else if (roundTimeRemaining <= 40000 && !usedUltimate) {
+                     if (botUltimateType === 'FULL_HEAL') {
+                         usedUltimate = true;
+                         const timeLabel = timeMultiplier > 1 ? ` ⚡${timeMultiplier}x REJUVENATION BONUS` : '';
+                         currentData.log.push(`Bot casts REGENERATION: ${currentData[opponentKey].selectedBird.ultimateDescription}${timeLabel}`);
+                         currentData[opponentKey].currentHealth = currentData[opponentKey].selectedBird.maxHealth;
+                         damage = 0;
+                     }
+                 }
 
                 if (!currentData.log) currentData.log = [];
 
