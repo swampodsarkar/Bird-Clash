@@ -234,23 +234,36 @@ export const findMatch = async (
 };
 
 export const createBotMatch = async (player: Player, selectedBird: Bird): Promise<Match> => {
-    // 1. Determine Bot Difficulty
-    const { tier } = getRankInfo(player.rankPoints);
+    // 1. Determine Bot Difficulty based on player rank
+    // Low ranks → weak bots (low level, common birds)
+    // High ranks (Heroic/Grandmaster) → very hard bots (high level, legendary birds)
     let botLevel: number;
     let availableRarities: ('Common' | 'Rare' | 'Epic' | 'Legendary')[];
 
     if (player.rankPoints < 1200) { // Bronze
-        botLevel = Math.floor(Math.random() * 10) + 1;
+        botLevel = Math.floor(Math.random() * 3) + 2;        // 2-4
+        availableRarities = ['Common'];
+    } else if (player.rankPoints < 1500) { // Silver
+        botLevel = Math.floor(Math.random() * 4) + 5;        // 5-8
         availableRarities = ['Common', 'Rare'];
-    } else if (player.rankPoints < 1900) { // Silver
-        botLevel = Math.floor(Math.random() * 10) + 10;
+    } else if (player.rankPoints < 1900) { // Gold
+        botLevel = Math.floor(Math.random() * 5) + 8;        // 8-12
         availableRarities = ['Common', 'Rare', 'Epic'];
-    } else if (player.rankPoints < 2500) { // Gold
-        botLevel = Math.floor(Math.random() * 10) + 20;
+    } else if (player.rankPoints < 2500) { // Platinum
+        botLevel = Math.floor(Math.random() * 6) + 12;       // 12-17
         availableRarities = ['Rare', 'Epic'];
-    } else { // Platinum+
-        botLevel = Math.floor(Math.random() * 10) + 30;
+    } else if (player.rankPoints < 3200) { // Diamond
+        botLevel = Math.floor(Math.random() * 7) + 16;       // 16-22
+        availableRarities = ['Rare', 'Epic', 'Legendary'];
+    } else if (player.rankPoints < 3600) { // Heroic
+        botLevel = Math.floor(Math.random() * 8) + 22;       // 22-29
         availableRarities = ['Epic', 'Legendary'];
+    } else if (player.rankPoints < 4000) { // Master
+        botLevel = Math.floor(Math.random() * 10) + 28;      // 28-37
+        availableRarities = ['Legendary'];
+    } else { // Grandmaster (4000+)
+        botLevel = Math.floor(Math.random() * 15) + 35;      // 35-49
+        availableRarities = ['Legendary'];
     }
 
     // 2. Select Bot's Bird
@@ -287,16 +300,10 @@ export const createBotMatch = async (player: Player, selectedBird: Bird): Promis
 
     const myClanTag = await getClanTag(player.clanId);
     
-    // --- FAIR PLAY NORMALIZATION FOR RANKED ---
-    // Bot matches generated this way are usually for Ranked fallback
-    let myBird = selectedBird;
-    
-    // Normalize both for consistency in Ranked mode
+    // --- NORMALIZE PLAYER BIRD (not bot) ---
+    // Bot uses its rank-based level, player gets normalized for fair chance
     const isNormalized = true;
-    botBird = getNormalizedBird(botBird);
-    botPlayer.selectedBird = botBird;
-    botPlayer.currentHealth = botBird.maxHealth;
-    myBird = getNormalizedBird(myBird);
+    let myBird = getNormalizedBird(selectedBird);
 
     // 6. Create Match Object
     const matchId = `match_bot_${Date.now()}`;
