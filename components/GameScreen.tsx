@@ -1212,7 +1212,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
       </div>
 
       {/* Center Battle Area */}
-      <div className="flex-grow flex flex-col items-center justify-center relative bg-black/20 border-2 border-black m-1 sm:m-2 overflow-hidden landscape:flex-1">
+      <div className="flex-grow flex flex-col items-center justify-center relative bg-black/20 border-2 border-black m-1 sm:m-2 overflow-hidden landscape:flex-1 battle-scene-3d">
         {particles.map(p => (
           <ParticleEffect key={p.id} particle={p} />
         ))}
