@@ -1002,9 +1002,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                      currentData[opponentKey].perfectMeter = 0;
                      currentData.log.push(`${currentData[opponentKey].displayName} unleashes SUPER PRECISE POWER!`);
                  }
-                 
-                 // --- Time-based Damage Multiplier ---
-                 let timeMultiplier = 1;
+                  
+                const botUltimateCooldown = currentData[opponentKey].ultimateCooldownLeft || 0;
+                const botUltimateType = currentData[opponentKey].selectedBird.ultimateType;
+                let usedUltimate = false;
+
+                // --- Time-based Damage Multiplier ---
+                  let timeMultiplier = 1;
                  if (currentData.roundTimerEndTime) {
                      const elapsed = Date.now() - (currentData.roundTimerEndTime - 60000);
                      if (elapsed >= 45000) timeMultiplier = 4;      // last 15s: 4x (ultra aggressive)
@@ -1034,13 +1038,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                      }
                  }
 
-                if (!currentData.log) currentData.log = [];
-
-                const botUltimateCooldown = currentData[opponentKey].ultimateCooldownLeft || 0;
-                const botUltimateType = currentData[opponentKey].selectedBird.ultimateType;
-
-                let usedUltimate = false;
-                if (botUltimateType && botUltimateCooldown <= 0) {
+                 if (botUltimateType && botUltimateCooldown <= 0 && !usedUltimate) {
                     usedUltimate = true;
                     const timeLabel = timeMultiplier > 1 ? ` ⚡${timeMultiplier}x TIME BONUS` : '';
                     currentData.log.push(`Bot uses ULTIMATE: ${currentData[opponentKey].selectedBird.ultimateDescription}${timeLabel}`);
