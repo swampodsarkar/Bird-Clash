@@ -444,6 +444,32 @@ export const autoPassTurn = async (matchId: string) => {
     const matchRef = rtdb.ref(`matches/${matchId}`);
     await matchRef.transaction(currentData => {
         if (!currentData || currentData.status !== 'active') return;
+        // Check if the round timer has expired — resolve the round instead of passing turn
+        if (currentData.roundTimerEndTime && Date.now() >= currentData.roundTimerEndTime) {
+            const p1Health = currentData.player1.currentHealth;
+            const p2Health = currentData.player2.currentHealth;
+            if (p1Health > p2Health) {
+                return processRoundEndTransaction(currentData, 'player1', 'player2', currentData.player1.uid);
+            } else if (p2Health > p1Health) {
+                return processRoundEndTransaction(currentData, 'player2', 'player1', currentData.player2.uid);
+            } else {
+                if (!currentData.log) currentData.log = [];
+                currentData.log.push("Round draw! Starting next round...");
+                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+                currentData.player1.activeEffects = {};
+                currentData.player2.activeEffects = {};
+                currentData.player1.perfectMeter = 0;
+                currentData.player2.perfectMeter = 0;
+                currentData.turn = 1;
+                currentData.currentRound = (currentData.currentRound || 1) + 1;
+                currentData.currentTurnPlayerUid = currentData.player1.uid;
+                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+                currentData.roundTimerEndTime = Date.now() + ROUND_TIMER_DURATION;
+                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+                return currentData;
+            }
+        }
         const currentUid = currentData.currentTurnPlayerUid;
         const meKey = currentData.player1.uid === currentUid ? 'player1' : 'player2';
         const opponentKey = meKey === 'player1' ? 'player2' : 'player1';

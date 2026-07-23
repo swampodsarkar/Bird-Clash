@@ -150,14 +150,15 @@ const processRoundEnd = (data: any, winnerKey: string, loserKey: string, winnerU
   });
 
   data[winnerKey].wins = (data[winnerKey].wins || 0) + 1;
+  const currentWins = data[winnerKey].wins;
 
   if (!data.log) data.log = [];
   data.log.push(`${data[winnerKey].displayName} wins Round ${data.currentRound}!`);
 
-  if (data[winnerKey].wins >= ROUNDS_TO_WIN) {
+  if (currentWins >= ROUNDS_TO_WIN) {
     data.winner = winnerUid;
     data.status = 'finished';
-    data.log.push(`${data[winnerKey].displayName} wins the match ${data[winnerKey].wins}-${data[loserKey].wins || 0}!`);
+    data.log.push(`${data[winnerKey].displayName} wins the match ${currentWins}-${data[loserKey].wins || 0}!`);
     return data;
   }
 
@@ -521,6 +522,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
     prevTurnRef.current = gameState.turn;
 
     if (gameState.status === 'finished' && !gameOverHandled.current) {
+        const winnerWins = (gameState.player1.uid === gameState.winner ? gameState.player1.wins : gameState.player2.wins) || 0;
+        if (winnerWins < ROUNDS_TO_WIN) {
+            gameOverHandled.current = true;
+            rtdb.ref(`matches/${gameState.id}/status`).set('active');
+            rtdb.ref(`matches/${gameState.id}/log`).push('Match status was incorrectly set to finished. Reverting to active.');
+            console.error('Premature game-over detected: winner has only', winnerWins, 'wins out of', ROUNDS_TO_WIN, 'needed. Reverting match status.');
+            setGameState(prev => ({ ...prev, status: 'active' }));
+            return;
+        }
         gameOverHandled.current = true;
         let outcome: 'win' | 'loss' | 'draw' = 'draw';
         if (gameState.winner === currentUserId) {
