@@ -37,7 +37,7 @@ export const checkAndResetQuests = async (userId: string): Promise<void> => {
 };
 
 // Fix: Added 'drone' to matchType to allow drone matches to update quest progress (e.g., for damage quests).
-export const updateQuestProgress = async (userId: string, matchType: 'rank' | 'classic' | 'war' | 'drone', damageDealt: number): Promise<void> => {
+export const updateQuestProgress = async (userId: string, matchType: 'rank' | 'classic' | 'war' | 'esports', damageDealt: number): Promise<void> => {
     // First, ensure quests are up-to-date
     await checkAndResetQuests(userId);
 

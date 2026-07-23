@@ -121,9 +121,8 @@ export interface PlayerQuestProgress {
 export interface DynamicDuo {
   partnerUid: string;
   partnerDisplayName: string;
-  // Fix: Add 'pending_received' to correctly model duo request states.
   status: 'pending_sent' | 'pending_received' | 'active';
-  since: number; // timestamp for when duo became active
+  since: number;
 }
 
 export interface ReferralData {
@@ -236,6 +235,14 @@ export interface Player {
   consecutiveLosses?: number;
   referral?: ReferralData;
   loginStreak?: LoginStreak;
+  totalMatches?: number;
+  totalWins?: number;
+  totalDamage?: number;
+  consecutiveWins?: number;
+  achievementPoints?: number;
+  lastFreeSpinDate?: string;
+  hasPurchasedStarterPack?: boolean;
+  unlockedAchievements?: string[];
 }
 
 export interface ClanMember {
@@ -266,6 +273,13 @@ export interface Clan {
     } };
 }
 
+export interface RoundResult {
+  roundNumber: number;
+  winner: string | null;
+  player1Health: number;
+  player2Health: number;
+}
+
 export interface MatchPlayer {
     uid: string;
     displayName: string | null;
@@ -285,6 +299,7 @@ export interface MatchPlayer {
     potions?: { [potionId: string]: number };
     activeEffects?: ActiveEffects;
     healUsesLeft?: number;
+    wins?: number;
 }
 
 export interface TurnTimer {
@@ -311,13 +326,15 @@ export interface Match {
     winner: string | 'draw' | 'team1' | 'team2' | null;
     createdAt: number;
     startTime: number;
-    matchType: 'rank' | 'classic' | 'war' | 'drone';
+    matchType: 'rank' | 'classic' | 'war' | 'esports';
     matchMode?: '1v1' | '2v2';
     warContext?: {
         warId: string;
         battleIndex: number;
     };
     turn: number;
+    currentRound: number;
+    rounds: RoundResult[];
     currentTurnPlayerUid: string;
     turnOrder?: string[];
     defeatedUids?: string[];
@@ -343,7 +360,7 @@ export interface MatchResult {
     opponentDamageDealt: number;
     myTeamDamageDealt?: number;
     opponentTeamDamageDealt?: number;
-    matchType: 'rank' | 'classic' | 'war' | 'drone';
+    matchType: 'rank' | 'classic' | 'war' | 'esports';
 }
 
 export interface MatchHistoryEntry {
@@ -353,7 +370,7 @@ export interface MatchHistoryEntry {
     myDamageDealt: number;
     opponentDamageDealt: number;
     outcome: 'win' | 'loss' | 'draw';
-    matchType: 'rank' | 'classic' | 'war' | 'drone';
+    matchType: 'rank' | 'classic' | 'war' | 'esports';
     rankPointChange: number;
     timestamp: number;
 }
@@ -381,7 +398,7 @@ export interface CustomRoom {
   guestDisplayName: string | null;
   guestPhotoURL: string | null;
   status: 'waiting' | 'full';
-  roomType: 'normal' | 'drone';
+  roomType: 'normal' | 'esports';
   matchId: string | null;
   createdAt: number;
 }

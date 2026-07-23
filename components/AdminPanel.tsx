@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Player } from '../types';
 import { rtdb } from '../services/firebase';
+import firebase from 'firebase/compat/app';
 import { Spinner } from './common/Spinner';
 import Button from './common/Button';
 
@@ -42,10 +43,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const handleUpdateCoins = async (uid: string, amount: number) => {
     try {
         const userRef = rtdb.ref(`users/${uid}`);
-        const user = users.find(u => u.uid === uid);
-        if (!user) return;
-        const newCoins = Math.max(0, user.coins + amount);
-        await userRef.update({ coins: newCoins });
+        await userRef.update({ coins: firebase.database.ServerValue.increment(amount) });
         fetchUsers(); // Refresh users
     } catch (error) {
         console.error("Failed to update coins:", error);

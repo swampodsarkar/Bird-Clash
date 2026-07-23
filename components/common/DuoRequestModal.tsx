@@ -11,7 +11,6 @@ interface DuoRequestModalProps {
 const DuoRequestModal: React.FC<DuoRequestModalProps> = ({ player, onAccept, onDecline }) => {
   const partnerName = player.dynamicDuo?.partnerDisplayName;
 
-  // Fix: The status type for DynamicDuo now includes 'pending_received', resolving the type error.
   if (!player.dynamicDuo || player.dynamicDuo.status !== 'pending_received') {
     return null;
   }
@@ -19,7 +18,7 @@ const DuoRequestModal: React.FC<DuoRequestModalProps> = ({ player, onAccept, onD
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="w-full max-w-sm p-6 bg-[#2c2c54] border-2 border-black shadow-[6px_6px_0px_#000000] text-center space-y-4">
-        <h2 className="text-xl font-bold text-pink-400">Dynamic Duo Request! ❤️</h2>
+        <h2 className="text-xl font-bold text-pink-400">Dynamic Duo Request!</h2>
         <p className="text-lg">
           <span className="font-bold">{partnerName || 'A player'}</span> wants to form a Dynamic Duo with you!
         </p>

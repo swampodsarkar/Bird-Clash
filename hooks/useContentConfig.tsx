@@ -51,7 +51,7 @@ const defaultStoreItems: StoreItem[] = [
     },
     {
         id: 'item_drone_card',
-        name: 'Drone View Card',
+        name: 'Esports Card',
         tier: 'Epic',
         description: 'Creates a premium room with an enhanced spectator view for streaming.',
         cost: { gems: 200 },

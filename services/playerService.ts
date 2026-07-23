@@ -525,19 +525,67 @@ export const equipBird = async (uid: string, birdId: string) => {
 };
 
 
-export const addPlayerXpAndLevelUp = async (uid: string, xpToAdd: number) => {
+const LEVEL_UP_REWARDS: { [level: number]: { coins?: number; gems?: number } } = {
+    2:  { coins: 500 },
+    3:  { coins: 1000 },
+    4:  { coins: 1500 },
+    5:  { coins: 2000, gems: 10 },
+    6:  { coins: 2500 },
+    7:  { coins: 3000 },
+    8:  { coins: 4000, gems: 15 },
+    9:  { coins: 5000 },
+    10: { coins: 6000, gems: 20 },
+    12: { coins: 8000, gems: 25 },
+    15: { coins: 10000, gems: 30 },
+    20: { coins: 15000, gems: 50 },
+    25: { coins: 20000, gems: 75 },
+    30: { coins: 30000, gems: 100 },
+    40: { coins: 50000, gems: 150 },
+    50: { coins: 100000, gems: 300 },
+};
+
+export interface LevelUpResult {
+    newLevel: number;
+    rewards: { coins?: number; gems?: number };
+    leveledUp: boolean;
+}
+
+export const addPlayerXpAndLevelUp = async (uid: string, xpToAdd: number): Promise<LevelUpResult | null> => {
     const userRef = rtdb.ref(`users/${uid}`);
+    let result: LevelUpResult | null = null;
     await userRef.transaction(player => {
         if (player) {
             player.xp = (player.xp || 0) + xpToAdd;
+            let gainedLevels: number[] = [];
             while (player.xp >= player.xpToNextLevel) {
                 player.xp -= player.xpToNextLevel;
                 player.level += 1;
+                gainedLevels.push(player.level);
                 player.xpToNextLevel = Math.floor(player.xpToNextLevel * 1.1);
+            }
+            if (gainedLevels.length > 0) {
+                const topLevel = gainedLevels[gainedLevels.length - 1];
+                let totalCoins = 0;
+                let totalGems = 0;
+                for (const lvl of gainedLevels) {
+                    const r = LEVEL_UP_REWARDS[lvl];
+                    if (r) {
+                        totalCoins += r.coins || 0;
+                        totalGems += r.gems || 0;
+                    }
+                }
+                if (totalCoins > 0) player.coins = (player.coins || 0) + totalCoins;
+                if (totalGems > 0) player.gems = (player.gems || 0) + totalGems;
+                result = {
+                    newLevel: topLevel,
+                    rewards: { coins: totalCoins || undefined, gems: totalGems || undefined },
+                    leveledUp: true,
+                };
             }
         }
         return player;
     });
+    return result;
 };
 
 export const submitReport = async (
@@ -966,8 +1014,8 @@ export const spinDiamondRoyale = async (uid: string): Promise<{ message: string 
     const { committed, snapshot } = await userRef.transaction(player => {
         if (!player) return; // Abort
 
-        cost = 9 * Math.pow(2, player.diamondSpins || 0);
-        if ((player.gems || 0) < cost) return; // Abort
+        cost = 20;
+        if ((player.gems || 0) < cost) return;
 
         player.gems -= cost;
         player.diamondSpins = (player.diamondSpins || 0) + 1;
@@ -988,9 +1036,7 @@ export const spinDiamondRoyale = async (uid: string): Promise<{ message: string 
     });
     
     if (!committed) {
-        const playerAfter = snapshot.val();
-        cost = 9 * Math.pow(2, (playerAfter?.diamondSpins || 0));
-        throw new Error(`Not enough gems. You need ${cost} gems to spin Diamond Royale.`);
+        throw new Error(`Not enough gems. You need 20 gems to spin Diamond Royale.`);
     }
 
     return { message: resultMessage };

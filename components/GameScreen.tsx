@@ -4,7 +4,7 @@ import type { Match, MatchResult, MatchPlayer, Player } from '../types';
 import { rtdb } from '../services/firebase';
 import * as playerService from '../services/playerService';
 import * as gameService from '../services/gameService';
-import type firebase from 'firebase/compat/app';
+import firebase from 'firebase/compat/app';
 import Button from './common/Button';
 import { getRankInfo } from '../utils/helpers';
 import { Spinner } from './common/Spinner';
@@ -13,6 +13,10 @@ import SettingsModal from './common/SettingsModal';
 import PlayerAvatar from './common/PlayerAvatar';
 import { useSettings } from '../hooks/useSettings';
 import { soundManager } from '../utils/sound';
+import LottieBird from './common/LottieBird';
+import { AttackEffect, ShieldEffect, HealEffect, UltimateEffect, HitEffect } from './common/LottieEffects';
+import VictoryAnimation from './common/VictoryAnimation';
+import PingIndicator from './common/PingIndicator';
 
 interface ReportModalProps {
     opponentName: string;
@@ -134,6 +138,53 @@ const ReactionAnimation: React.FC<{ payload: { reaction: string; targetPlayerUid
 
 const CONFIRM_FORFEIT_KEY = 'ff-forfeit-confirm';
 
+const ROUNDS_TO_WIN = 2;
+const MAX_TURNS_PER_ROUND = 10;
+
+const processRoundEnd = (data: any, winnerKey: string, loserKey: string, winnerUid: string) => {
+  if (!data.rounds) data.rounds = [];
+  data.rounds.push({
+    roundNumber: data.currentRound || 1,
+    winner: winnerUid,
+    player1Health: Math.max(0, data.player1.currentHealth),
+    player2Health: Math.max(0, data.player2.currentHealth),
+  });
+
+  data[winnerKey].wins = (data[winnerKey].wins || 0) + 1;
+
+  if (!data.log) data.log = [];
+  data.log.push(`${data[winnerKey].displayName} wins Round ${data.currentRound}!`);
+
+  if (data[winnerKey].wins >= ROUNDS_TO_WIN) {
+    data.winner = winnerUid;
+    data.status = 'finished';
+    data.log.push(`${data[winnerKey].displayName} wins the match ${data[winnerKey].wins}-${data[loserKey].wins || 0}!`);
+    return data;
+  }
+
+  data.currentRound = (data.currentRound || 1) + 1;
+
+  data.player1.currentHealth = data.player1.selectedBird.maxHealth;
+  data.player2.currentHealth = data.player2.selectedBird.maxHealth;
+
+  data.player1.activeEffects = {};
+  data.player2.activeEffects = {};
+
+  data.turn = 1;
+
+  data.currentTurnPlayerUid = data[loserKey].uid;
+
+  data.turnTimer = {
+    currentTurnStartTime: Date.now(),
+    turnDuration: 30,
+  };
+
+  data.log.push(`--- Round ${data.currentRound} ---`);
+  data.log.push(`${data[loserKey].displayName} starts Round ${data.currentRound}.`);
+
+  return data;
+};
+
 const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOver }) => {
   const currentUserId = currentPlayer.uid;
   const [gameState, setGameState] = useState<Match>(match);
@@ -145,6 +196,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   const [damageNumbers, setDamageNumbers] = useState<{ amount: number; target: 'me' | 'opponent'; key: number }[]>([]);
   const [animationClasses, setAnimationClasses] = useState({ me: '', opponent: '', screen: '' });
   const [particles, setParticles] = useState<Particle[]>([]);
+  const [activeEffect, setActiveEffect] = useState<'attack' | 'shield' | 'heal' | 'ultimate' | 'hit' | null>(null);
   const [isEmotePanelOpen, setIsEmotePanelOpen] = useState(false);
   const [emoteCooldown, setEmoteCooldown] = useState(false);
   const [emoteDisplay, setEmoteDisplay] = useState<{ me: { emote: string; key: string } | null; opponent: { emote: string; key: string } | null }>({ me: null, opponent: null });
@@ -233,6 +285,53 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
   const isOpponentBot = useMemo(() => opponent?.isBot === true, [opponent]);
 
+  // --- Auto-forfeit on opponent disconnect (runs once per match) ---
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'active' || isOpponentBot) return;
+    if (!opponent?.uid) return;
+
+    const myDisconnectRef = rtdb.ref(`matches/${match.id}/disconnections/${currentUserId}`);
+    const allDisconnectsRef = rtdb.ref(`matches/${match.id}/disconnections`);
+
+    // Set onDisconnect: marks me as disconnected
+    myDisconnectRef.onDisconnect().set({
+      disconnectedAt: firebase.database.ServerValue.TIMESTAMP,
+      uid: currentUserId,
+    }).then(() => {
+      myDisconnectRef.set(null); // Clear current
+    });
+
+    // Watch opponent's disconnect status
+    let forfeitTimer: number | null = null;
+    const opponentDisconnectRef = rtdb.ref(`matches/${match.id}/disconnections/${opponent.uid}`);
+    const listener = (snap: firebase.database.DataSnapshot) => {
+      if (!snap.exists()) {
+        if (forfeitTimer) { clearTimeout(forfeitTimer); forfeitTimer = null; }
+        return;
+      }
+      const data = snap.val();
+      if (!data || !data.disconnectedAt) {
+        if (forfeitTimer) { clearTimeout(forfeitTimer); forfeitTimer = null; }
+        return;
+      }
+      // Start a 15s grace period timer
+      if (!forfeitTimer) {
+        forfeitTimer = window.setTimeout(() => {
+          gameService.forfeitMatch(match.id, opponent.uid).catch(() => {});
+        }, 15000);
+      }
+    };
+    opponentDisconnectRef.on('value', listener);
+
+    return () => {
+      if (forfeitTimer) clearTimeout(forfeitTimer);
+      myDisconnectRef.onDisconnect().cancel();
+      myDisconnectRef.remove().catch(() => {});
+      opponentDisconnectRef.off('value', listener);
+      allDisconnectsRef.remove().catch(() => {});
+    };
+  }, [currentUserId, match.id, opponent?.uid, isOpponentBot]);
+
   // Turn Timer Logic
   useEffect(() => {
     if (!gameState.turnTimer || gameState.status !== 'active') {
@@ -269,14 +368,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   // Calculate potential damage for preview
   const potentialDamage = useMemo(() => {
       if (!me || !opponent) return 0;
+      if (opponent.activeEffects?.invulnerable) return 0;
+
       let damage = me.selectedBird.skillPower;
+
+      if (me.activeEffects?.doubleAttack) {
+          damage *= 2;
+      }
 
       if (me.currentHealth / me.selectedBird.maxHealth <= 0.3) {
           damage = Math.floor(damage * 1.2);
       }
 
-      if (opponent.activeEffects?.defenseBuff || opponent.activeEffects?.blocking) {
+      if (opponent.activeEffects?.blocking) {
+          damage = Math.floor(damage * 0.3);
+      } else if (opponent.activeEffects?.defenseBuff) {
           damage = Math.floor(damage * 0.5);
+      }
+
+      if (opponent.activeEffects?.shield) {
+          damage = Math.max(0, damage - opponent.activeEffects.shield);
       }
       return damage;
   }, [me, opponent]);
@@ -336,21 +447,25 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         setAnimationClasses({ me: 'anim-attack-me', opponent: 'anim-hit-reaction', screen: '' });
         addDamageNumber(opponentDamageTaken, 'opponent');
         spawnParticles('damage', 5);
+        setActiveEffect('attack');
         soundManager.play('attack');
     }
     if (myDamageTaken > 0) {
         setAnimationClasses({ me: 'anim-hit-reaction', opponent: 'anim-attack-opponent', screen: 'anim-screen-shake' });
         addDamageNumber(myDamageTaken, 'me');
         spawnParticles('damage', 3);
+        setActiveEffect('hit');
         soundManager.play('hit');
     }
 
     if (newMe.currentHealth > (prevHealthRef.current.me ?? newMe.currentHealth)) {
       spawnParticles('heal', 4);
+      setActiveEffect('heal');
     }
 
     if (opponent.activeEffects?.blocking && opponentDamageTaken === 0 && prevTurnRef.current !== gameState.turn) {
       spawnParticles('block', 6);
+      setActiveEffect('shield');
       soundManager.play('block');
     }
 
@@ -402,6 +517,42 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         const meKey = currentData.player1.uid === currentUserId ? 'player1' : 'player2';
         const opponentKey = meKey === 'player1' ? 'player2' : 'player1';
 
+        // --- Process Burn (tick at turn start) ---
+        [meKey, opponentKey].forEach(key => {
+            const burn = currentData[key].activeEffects?.burn;
+            if (burn) {
+                currentData[key].currentHealth -= burn.damage;
+                currentData.log.push(`${currentData[key].displayName} takes ${burn.damage} burn damage!`);
+                burn.turns -= 1;
+                if (burn.turns <= 0) delete currentData[key].activeEffects.burn;
+            }
+        });
+
+        // --- Burn kill check (round end) ---
+        if (currentData[opponentKey].currentHealth <= 0) {
+            return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
+        }
+        if (currentData[meKey].currentHealth <= 0) {
+            return processRoundEnd(currentData, opponentKey, meKey, currentData[opponentKey].uid);
+        }
+
+        // --- Check if attacker is STUNNED ---
+        if (currentData[meKey].activeEffects?.stunned) {
+            delete currentData[meKey].activeEffects.stunned;
+            currentData.log.push(`${currentData[meKey].displayName} is stunned and misses a turn!`);
+            // Still pass turn with no attack
+            if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
+                currentData[meKey].ultimateCooldownLeft -= 1;
+            }
+            if (currentData[meKey].abilityCooldownLeft && currentData[meKey].abilityCooldownLeft > 0) {
+                currentData[meKey].abilityCooldownLeft -= 1;
+            }
+            currentData.turn += 1;
+            currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
+            currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+            return currentData;
+        }
+
         let damage = currentData[meKey].selectedBird.skillPower;
 
         // --- Block Defense Check ---
@@ -430,6 +581,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             delete currentData[opponentKey].activeEffects.defenseBuff;
         }
 
+        // Shield absorbs damage first
+        if (currentData[opponentKey].activeEffects?.shield) {
+            const shieldHp = currentData[opponentKey].activeEffects.shield;
+            if (damage <= shieldHp) {
+                currentData[opponentKey].activeEffects.shield -= damage;
+                damage = 0;
+                currentData.log.push(`${currentData[opponentKey].displayName}'s shield absorbed the attack!`);
+            } else {
+                damage -= shieldHp;
+                delete currentData[opponentKey].activeEffects.shield;
+                currentData.log.push(`${currentData[opponentKey].displayName}'s shield shattered!`);
+            }
+        }
+
         currentData[opponentKey].currentHealth -= damage;
         currentData[meKey].damageDealt += damage;
 
@@ -440,21 +605,34 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             currentData[meKey].ultimateCooldownLeft -= 1;
         }
 
-        if (currentData[opponentKey].currentHealth <= 0) {
-            currentData.winner = currentUserId;
-            currentData.status = 'finished';
-            currentData.log.push(`${currentData[meKey].displayName} wins!`);
-            return currentData;
+        if (currentData[meKey].abilityCooldownLeft && currentData[meKey].abilityCooldownLeft > 0) {
+            currentData[meKey].abilityCooldownLeft -= 1;
         }
-        if (currentData.turn >= 10) {
-            currentData.status = 'finished';
+
+        if (currentData[opponentKey].currentHealth <= 0) {
+            return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
+        }
+        if (currentData.turn >= MAX_TURNS_PER_ROUND) {
             const p1Health = currentData.player1.currentHealth;
             const p2Health = currentData.player2.currentHealth;
-            if (p1Health > p2Health) currentData.winner = currentData.player1.uid;
-            else if (p2Health > p1Health) currentData.winner = currentData.player2.uid;
-            else currentData.winner = 'draw';
-            currentData.log.push("Time's up! Winner by health.");
-            return currentData;
+            if (p1Health > p2Health) {
+                return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
+            } else if (p2Health > p1Health) {
+                return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
+            } else {
+                if (!currentData.log) currentData.log = [];
+                currentData.log.push("Round draw! Starting next round...");
+                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+                currentData.player1.activeEffects = {};
+                currentData.player2.activeEffects = {};
+                currentData.turn = 1;
+                currentData.currentRound = (currentData.currentRound || 1) + 1;
+                currentData.currentTurnPlayerUid = currentData.player1.uid;
+                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+                return currentData;
+            }
         }
         currentData.turn += 1;
         const nextUid = currentData[opponentKey].uid;
@@ -513,6 +691,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
     setIsSubmitting(true);
     const matchRef = rtdb.ref(`matches/${match.id}`);
+
+    let ultEffect: 'ultimate' | 'heal' | null = null;
+
     matchRef.transaction(currentData => {
         if (!currentData || currentData.status !== 'active' || currentData.currentTurnPlayerUid !== currentUserId) return;
         const meKey = currentData.player1.uid === currentUserId ? 'player1' : 'player2';
@@ -539,11 +720,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             }
             currentData[opponentKey].currentHealth -= damage;
             currentData[meKey].damageDealt += damage;
-            spawnParticles('ultimate', 8);
-            soundManager.play('ultimate');
+            ultEffect = 'ultimate';
         } else if (ultimateType === 'FULL_HEAL') {
             currentData[meKey].currentHealth = currentData[meKey].selectedBird.maxHealth;
-            spawnParticles('heal', 8);
+            ultEffect = 'heal';
         } else if (ultimateType === 'INVULNERABILITY') {
             if (!currentData[meKey].activeEffects) currentData[meKey].activeEffects = {};
             currentData[meKey].activeEffects.invulnerable = true;
@@ -555,20 +735,29 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         currentData[meKey].ultimateCooldownLeft = currentData[meKey].selectedBird.ultimateCooldown;
 
         if (currentData[opponentKey].currentHealth <= 0) {
-            currentData.winner = currentUserId;
-            currentData.status = 'finished';
-            currentData.log.push(`${currentData[meKey].displayName} wins!`);
-            return currentData;
+            return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
         }
-        if (currentData.turn >= 10) {
-            currentData.status = 'finished';
+        if (currentData.turn >= MAX_TURNS_PER_ROUND) {
             const p1Health = currentData.player1.currentHealth;
             const p2Health = currentData.player2.currentHealth;
-            if (p1Health > p2Health) currentData.winner = currentData.player1.uid;
-            else if (p2Health > p1Health) currentData.winner = currentData.player2.uid;
-            else currentData.winner = 'draw';
-            currentData.log.push("Time's up! Winner by health.");
-            return currentData;
+            if (p1Health > p2Health) {
+                return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
+            } else if (p2Health > p1Health) {
+                return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
+            } else {
+                if (!currentData.log) currentData.log = [];
+                currentData.log.push("Round draw! Starting next round...");
+                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+                currentData.player1.activeEffects = {};
+                currentData.player2.activeEffects = {};
+                currentData.turn = 1;
+                currentData.currentRound = (currentData.currentRound || 1) + 1;
+                currentData.currentTurnPlayerUid = currentData.player1.uid;
+                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+                return currentData;
+            }
         }
         currentData.turn += 1;
         currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
@@ -577,7 +766,89 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             turnDuration: 30,
         };
         return currentData;
+    }).then(() => {
+        if (ultEffect) {
+            spawnParticles(ultEffect, 8);
+            setActiveEffect(ultEffect);
+            if (ultEffect === 'ultimate') soundManager.play('ultimate');
+        }
     }).catch(error => toast.error("Ultimate failed."))
+      .finally(() => setIsSubmitting(false));
+  }, [isMyTurn, isSubmitting, currentUserId, match.id, me]);
+
+  const handleAbility = useCallback(() => {
+    if (!isMyTurn || isSubmitting) return;
+    soundManager.play('button_click');
+
+    const birdDef = me?.selectedBird;
+    if (!birdDef || !birdDef.abilityType) return;
+    if (me?.abilityCooldownLeft && me.abilityCooldownLeft > 0) {
+        toast.info(`Ability is on cooldown for ${me.abilityCooldownLeft} more turns.`);
+        return;
+    }
+
+    setIsSubmitting(true);
+    const matchRef = rtdb.ref(`matches/${match.id}`);
+    matchRef.transaction(currentData => {
+        if (!currentData || currentData.status !== 'active' || currentData.currentTurnPlayerUid !== currentUserId) return;
+        const meKey = currentData.player1.uid === currentUserId ? 'player1' : 'player2';
+        const opponentKey = meKey === 'player1' ? 'player2' : 'player1';
+
+        if (currentData[meKey].abilityUsesLeft !== undefined && currentData[meKey].abilityUsesLeft <= 0) {
+            if (!currentData.log) currentData.log = [];
+            currentData.log.push(`${currentData[meKey].displayName} has no ability uses left!`);
+            return;
+        }
+
+        if (!currentData.log) currentData.log = [];
+
+        const abilityType = currentData[meKey].selectedBird.abilityType;
+        const abilityValue = currentData[meKey].selectedBird.abilityValue || 0;
+
+        if (abilityType === 'SHIELD') {
+            if (!currentData[meKey].activeEffects) currentData[meKey].activeEffects = {};
+            currentData[meKey].activeEffects.shield = abilityValue;
+            currentData.log.push(`${currentData[meKey].displayName} uses ${currentData[meKey].selectedBird.abilityDescription}`);
+        } else if (abilityType === 'DEFENSE_BUFF') {
+            if (!currentData[meKey].activeEffects) currentData[meKey].activeEffects = {};
+            currentData[meKey].activeEffects.defenseBuff = true;
+            currentData.log.push(`${currentData[meKey].displayName} uses ${currentData[meKey].selectedBird.abilityDescription}`);
+        } else if (abilityType === 'BURN') {
+            if (!currentData[opponentKey].activeEffects) currentData[opponentKey].activeEffects = {};
+            currentData[opponentKey].activeEffects.burn = { turns: 2, damage: abilityValue };
+            currentData.log.push(`${currentData[meKey].displayName} uses ${currentData[meKey].selectedBird.abilityDescription}`);
+        } else if (abilityType === 'STUN_CHANCE') {
+            const stunned = Math.random() < (abilityValue / 100);
+            if (stunned) {
+                if (!currentData[opponentKey].activeEffects) currentData[opponentKey].activeEffects = {};
+                currentData[opponentKey].activeEffects.stunned = true;
+                currentData.log.push(`${currentData[meKey].displayName} stuns ${currentData[opponentKey].displayName}!`);
+            } else {
+                currentData.log.push(`${currentData[meKey].displayName}'s stun attempt failed.`);
+            }
+        }
+
+        // Decrement ability uses (2 per match max)
+        if (currentData[meKey].abilityUsesLeft !== undefined) {
+            currentData[meKey].abilityUsesLeft -= 1;
+        }
+
+        // Start ability cooldown
+        const abilityCd = currentData[meKey].selectedBird.abilityCooldown ?? 4;
+        currentData[meKey].abilityCooldownLeft = abilityCd;
+
+        if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
+            currentData[meKey].ultimateCooldownLeft -= 1;
+        }
+
+        currentData.turn += 1;
+        currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
+        currentData.turnTimer = {
+            currentTurnStartTime: Date.now(),
+            turnDuration: 30,
+        };
+        return currentData;
+    }).catch(error => toast.error("Ability failed."))
       .finally(() => setIsSubmitting(false));
   }, [isMyTurn, isSubmitting, currentUserId, match.id, me]);
 
@@ -675,6 +946,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                     if (botUltimateType === 'MASSIVE_DAMAGE') {
                         damage = currentData[opponentKey].selectedBird.ultimateValue || 0;
                         spawnParticles('ultimate', 8);
+                        setActiveEffect('ultimate');
                     } else if (botUltimateType === 'FULL_HEAL') {
                         currentData[opponentKey].currentHealth = currentData[opponentKey].selectedBird.maxHealth;
                         damage = 0;
@@ -737,20 +1009,29 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                 }
 
                 if (currentData[meKey].currentHealth <= 0) {
-                    currentData.winner = opponent?.uid;
-                    currentData.status = 'finished';
-                    currentData.log.push(`Bot wins!`);
-                    return currentData;
+                    return processRoundEnd(currentData, opponentKey, meKey, opponent?.uid || '');
                 }
-                if (currentData.turn >= 10) {
-                    currentData.status = 'finished';
+                if (currentData.turn >= MAX_TURNS_PER_ROUND) {
                     const p1Health = currentData.player1.currentHealth;
                     const p2Health = currentData.player2.currentHealth;
-                    if (p1Health > p2Health) currentData.winner = currentData.player1.uid;
-                    else if (p2Health > p1Health) currentData.winner = currentData.player2.uid;
-                    else currentData.winner = 'draw';
-                    currentData.log.push("Time's up! Winner by health.");
-                    return currentData;
+                    if (p1Health > p2Health) {
+                        return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
+                    } else if (p2Health > p1Health) {
+                        return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
+                    } else {
+                        if (!currentData.log) currentData.log = [];
+                        currentData.log.push("Round draw! Starting next round...");
+                        currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+                        currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+                        currentData.player1.activeEffects = {};
+                        currentData.player2.activeEffects = {};
+                        currentData.turn = 1;
+                        currentData.currentRound = (currentData.currentRound || 1) + 1;
+                        currentData.currentTurnPlayerUid = currentData.player1.uid;
+                        currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+                        currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+                        return currentData;
+                    }
                 }
                 currentData.turn += 1;
                 currentData.currentTurnPlayerUid = currentData[meKey].uid;
@@ -793,10 +1074,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   }
 
   const isP1 = me.uid === gameState.player1.uid;
-  const p1MovesLeft = 5 - Math.floor((gameState.turn - 1) / 2);
-  const p2MovesLeft = 5 - Math.floor(gameState.turn / 2);
-  const myMovesLeft = isP1 ? p1MovesLeft : p2MovesLeft;
-  const opponentMovesLeft = isP1 ? p2MovesLeft : p1MovesLeft;
+  const myWins = me.wins || 0;
+  const oppWins = opponent.wins || 0;
+  const currentRound = gameState.currentRound || 1;
   const turnTimePercent = turnTimeLeft !== null ? (turnTimeLeft / 30) * 100 : 0;
   const isTimeLow = turnTimeLeft !== null && turnTimeLeft <= 10;
 
@@ -815,15 +1095,23 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           </div>
         </div>
       )}
-      {gameState.isNormalized && (
-          <div className="absolute top-0 left-0 right-0 bg-yellow-600 text-black text-center text-xs font-bold py-1 z-40">
-              ⚖️ FAIR MATCH - STATS NORMALIZED
-          </div>
-      )}
+      {/* Ping indicator - top right corner */}
+      <div className="absolute top-1 right-1 z-50">
+        <PingIndicator />
+      </div>
+
+      {/* Round indicator bar */}
+      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-black/70 px-3 py-1 rounded-full border border-yellow-500/50">
+        <span className="text-[10px] font-bold text-yellow-400">R{currentRound}</span>
+        <span className="text-[10px] text-white">|</span>
+        <span className="text-[10px] text-green-400">{me.displayName?.split(' ')[0] || 'P1'} {myWins}</span>
+        <span className="text-[10px] text-gray-400">-</span>
+        <span className="text-[10px] text-red-400">{oppWins} {opponent.displayName?.split(' ')[0] || 'P2'}</span>
+      </div>
 
       {/* Left/Opponent section */}
       <div className="flex flex-col landscape:w-1/4 landscape:h-full p-1 sm:p-2">
-        <PlayerDisplay player={opponent} isTurn={!isMyTurn && isGameActive} movesLeft={opponentMovesLeft} isP1={!isP1} />
+        <PlayerDisplay player={opponent} isTurn={!isMyTurn && isGameActive} roundWins={oppWins} isP1={!isP1} />
       </div>
 
       {/* Center Battle Area */}
@@ -831,6 +1119,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         {particles.map(p => (
           <ParticleEffect key={p.id} particle={p} />
         ))}
+
+        {activeEffect === 'attack' && <AttackEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'shield' && <ShieldEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'heal' && <HealEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'ultimate' && <UltimateEffect show={true} onComplete={() => setActiveEffect(null)} />}
+        {activeEffect === 'hit' && <HitEffect show={true} onComplete={() => setActiveEffect(null)} />}
 
         <div className="flex items-center justify-around w-full h-full relative">
           {damageNumbers.map(dn => (
@@ -842,7 +1136,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           <div className={`relative ${animationClasses.opponent}`}>
             <div ref={el => { if (el) playerRefs.current.set(opponent.uid, el); }}>
               <EmoteBubble payload={emoteDisplay.opponent} />
-              <span className="text-6xl sm:text-8xl md:text-9xl transform -scale-x-100">{opponent.selectedBird.icon}</span>
+              <LottieBird bird={opponent.selectedBird} size="lg" animated={true} />
             </div>
           </div>
 
@@ -870,16 +1164,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
           <div className={`relative ${animationClasses.me}`}>
             <div ref={el => { if (el) playerRefs.current.set(me.uid, el); }}>
               <EmoteBubble payload={emoteDisplay.me} />
-              <span className="text-6xl sm:text-8xl md:text-9xl">{me.selectedBird.icon}</span>
+              <LottieBird bird={me.selectedBird} size="lg" animated={true} />
             </div>
           </div>
         </div>
 
         {gameOverState && (
           <div className="game-over-overlay">
-            {gameOverState === 'win' && <h1 className="game-over-text victory-text">VICTORY</h1>}
-            {gameOverState === 'loss' && <h1 className="game-over-text defeat-text">DEFEAT</h1>}
-            {gameOverState === 'draw' && <h1 className="game-over-text draw-text">DRAW</h1>}
+            {gameOverState === 'win' && (
+              <>
+                <VictoryAnimation type="victory" />
+                <h1 className="game-over-text victory-text z-50">VICTORY</h1>
+              </>
+            )}
+            {gameOverState === 'loss' && (
+              <>
+                <VictoryAnimation type="defeat" />
+                <h1 className="game-over-text defeat-text z-50">DEFEAT</h1>
+              </>
+            )}
+            {gameOverState === 'draw' && <h1 className="game-over-text draw-text z-50">DRAW</h1>}
           </div>
         )}
         <ReactionAnimation payload={reactionDisplay} playerRefs={playerRefs} />
@@ -887,67 +1191,82 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
       {/* Right/My section */}
       <div className="flex flex-col landscape:w-1/4 landscape:h-full p-1 sm:p-2">
-        <PlayerDisplay player={me} isTurn={isMyTurn && isGameActive} movesLeft={myMovesLeft} isP1={isP1} />
+        <PlayerDisplay player={me} isTurn={isMyTurn && isGameActive} roundWins={myWins} isP1={isP1} />
 
-        {/* Action Buttons - Landscape: below my panel */}
-        <div className="mt-1 sm:mt-2 flex flex-col gap-1 sm:gap-2">
-          <div className="grid grid-cols-2 gap-1 sm:gap-2">
-            {me.selectedBird.ultimateType && (
-              <Button
-                onClick={handleUltimate}
-                disabled={!isMyTurn || isSubmitting || (me.ultimateCooldownLeft ?? 0) > 0}
-                className="!py-1 sm:!py-2 !text-sm sm:!text-base flex flex-col items-center justify-center bg-purple-600 hover:bg-purple-700 !min-h-0"
-              >
-                {isSubmitting ? <Spinner /> : (
-                  <>
-                    <span>ULTIMATE</span>
-                    <span className="text-[9px] sm:text-xs text-purple-200">
-                      {(me.ultimateCooldownLeft ?? 0) > 0 ? `CD: ${me.ultimateCooldownLeft}` : `~${me.selectedBird.ultimateValue || 0}dmg`}
-                    </span>
-                  </>
-                )}
-              </Button>
+        {/* Action Buttons */}
+        <div className="mt-1 sm:mt-2 flex flex-col gap-1.5">
+          {/* Row 1: Attack (main) */}
+          <button
+            onClick={handleAttack}
+            disabled={!isMyTurn || isSubmitting}
+            className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-red-600 to-orange-600 border-2 border-red-400 rounded-lg font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-[0_4px_0_#991b1b] active:translate-y-1 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_4px_0_#991b1b] hover:from-red-500 hover:to-orange-500"
+          >
+            {isSubmitting ? <Spinner /> : (
+              <><span className="text-lg">⚔️</span> ATTACK <span className="text-yellow-300 text-xs">~{potentialDamage}</span></>
             )}
-            <Button
+          </button>
+
+          {/* Row 2: Ability + Block + Ultimate */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {/* Bird Special Ability */}
+            {me.selectedBird.abilityType && (
+              <button
+                onClick={handleAbility}
+                disabled={!isMyTurn || isSubmitting || (me.abilityCooldownLeft ?? 0) > 0}
+                className="py-2 bg-gradient-to-br from-green-600 to-emerald-700 border-2 border-green-400 rounded-lg font-bold text-[10px] sm:text-xs flex flex-col items-center justify-center gap-0.5 shadow-[0_3px_0_#166534] active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_3px_0_#166534] hover:from-green-500 hover:to-emerald-600"
+              >
+                <span className="text-sm">✨</span>
+                <span>ABILITY</span>
+                <span className="text-green-300 text-[8px]">
+                  {(me.abilityCooldownLeft ?? 0) > 0 ? `CD:${me.abilityCooldownLeft}` : (me.selectedBird.abilityDescription?.split(':')[0] || '')}
+                </span>
+              </button>
+            )}
+
+            {/* Block */}
+            <button
               onClick={handleBlock}
               disabled={!isMyTurn || isSubmitting}
-              className="!py-1 sm:!py-2 !text-sm sm:!text-base flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700 !min-h-0"
+              className="py-2 bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-blue-400 rounded-lg font-bold text-[10px] sm:text-xs flex flex-col items-center justify-center gap-0.5 shadow-[0_3px_0_#1e40af] active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_3px_0_#1e40af] hover:from-blue-500 hover:to-indigo-600"
             >
-              {isSubmitting ? <Spinner /> : (
-                <>
-                  <span>🛡 BLOCK</span>
-                  <span className="text-[9px] sm:text-xs text-blue-200">-70% dmg</span>
-                </>
-              )}
-            </Button>
+              <span className="text-sm">🛡</span>
+              <span>BLOCK</span>
+              <span className="text-blue-300 text-[8px]">-70%</span>
+            </button>
+
+            {/* Ultimate */}
+            {me.selectedBird.ultimateType && (
+              <button
+                onClick={handleUltimate}
+                disabled={!isMyTurn || isSubmitting || (me.ultimateCooldownLeft ?? 0) > 0}
+                className="py-2 bg-gradient-to-br from-purple-600 to-pink-700 border-2 border-purple-400 rounded-lg font-bold text-[10px] sm:text-xs flex flex-col items-center justify-center gap-0.5 shadow-[0_3px_0_#6b21a8] active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-40 disabled:translate-y-0 disabled:shadow-[0_3px_0_#6b21a8] hover:from-purple-500 hover:to-pink-600"
+              >
+                <span className="text-sm">💥</span>
+                <span>ULTIMATE</span>
+                <span className="text-purple-300 text-[8px]">
+                  {(me.ultimateCooldownLeft ?? 0) > 0 ? `CD:${me.ultimateCooldownLeft}` : `~${me.selectedBird.ultimateValue || 0}`}
+                </span>
+              </button>
+            )}
           </div>
 
-          <Button onClick={handleAttack} disabled={!isMyTurn || isSubmitting} className="w-full !py-2 sm:!py-3 !text-lg sm:!text-xl flex items-center justify-center gap-2">
-            {isSubmitting ? <Spinner /> : (
-              <>
-                <span>⚔️ ATTACK</span>
-                <span className="text-xs sm:text-sm text-yellow-200">~{potentialDamage}</span>
-              </>
-            )}
-          </Button>
-
-          {/* Potions & Utility Row */}
-          <div className="flex gap-1 sm:gap-2 items-center">
+          {/* Row 3: Potions + Utility */}
+          <div className="flex gap-1 items-center">
             {me.potions && (Object.entries(me.potions) as [string, number][]).filter(([, count]) => count > 0).map(([potionId, count]) => (
               <button
                 key={potionId}
                 onClick={() => handleUsePotion(potionId)}
                 disabled={!isMyTurn || isSubmitting}
-                className="flex-1 h-10 sm:h-12 bg-blue-900/80 border-2 border-black text-sm flex flex-col items-center justify-center disabled:opacity-40 rounded hover:bg-blue-800 transition-colors"
+                className="flex-1 h-9 sm:h-10 bg-gradient-to-r from-teal-700 to-cyan-800 border-2 border-teal-400 text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 rounded-lg disabled:opacity-40 hover:from-teal-600 hover:to-cyan-700 transition-all active:scale-95"
                 title={`Use potion (ends turn)`}
               >
-                <span className="text-lg sm:text-xl">🧪</span>
-                <span className="text-[9px] sm:text-xs font-bold">{count}</span>
+                <span>🧪</span>
+                <span>{count}</span>
               </button>
             ))}
-            <button onClick={() => setIsEmotePanelOpen(prev => !prev)} className="h-10 sm:h-12 w-10 sm:w-12 bg-gray-800 border-2 border-black text-xl sm:text-2xl rounded hover:bg-gray-700 transition-colors">😊</button>
-            <button onClick={() => setShowForfeitConfirm(true)} className="h-10 sm:h-12 w-10 sm:w-12 bg-red-900/80 border-2 border-black text-sm rounded hover:bg-red-800 transition-colors" title="Forfeit">🏳️</button>
-            <button onClick={() => setIsSettingsOpen(true)} className="h-10 sm:h-12 w-10 sm:w-12 bg-gray-800 border-2 border-black text-xl sm:text-2xl rounded hover:bg-gray-700 transition-colors">⚙️</button>
+            <button onClick={() => setIsEmotePanelOpen(prev => !prev)} className="h-9 sm:h-10 w-9 sm:w-10 bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-gray-500 text-lg rounded-lg hover:from-gray-600 hover:to-gray-800 transition-all active:scale-95">😊</button>
+            <button onClick={() => setShowForfeitConfirm(true)} className="h-9 sm:h-10 w-9 sm:w-10 bg-gradient-to-br from-red-800 to-red-950 border-2 border-red-500 text-sm rounded-lg hover:from-red-700 hover:to-red-900 transition-all active:scale-95" title="Forfeit">🏳️</button>
+            <button onClick={() => setIsSettingsOpen(true)} className="h-9 sm:h-10 w-9 sm:w-10 bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-gray-500 text-lg rounded-lg hover:from-gray-600 hover:to-gray-800 transition-all active:scale-95">⚙️</button>
           </div>
         </div>
       </div>
@@ -979,7 +1298,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   );
 };
 
-const PlayerDisplay: React.FC<{ player: MatchPlayer, isTurn: boolean, movesLeft: number, isP1: boolean }> = ({ player, isTurn, movesLeft, isP1 }) => {
+const PlayerDisplay: React.FC<{ player: MatchPlayer, isTurn: boolean, roundWins: number, isP1: boolean }> = ({ player, isTurn, roundWins, isP1 }) => {
     if (!player || !player.selectedBird) return null;
     const healthPercent = (player.currentHealth / player.selectedBird.maxHealth) * 100;
     const { rankName } = getRankInfo(player.rankPoints);
@@ -1010,8 +1329,9 @@ const PlayerDisplay: React.FC<{ player: MatchPlayer, isTurn: boolean, movesLeft:
                 </div>
             </div>
             <div className="text-right flex-shrink-0 ml-1">
-                {movesLeft <= 2 && movesLeft > 0 && <p className="font-pixel text-[10px] sm:text-sm text-yellow-400">{movesLeft}</p>}
-                {movesLeft > 2 && <p className="font-pixel text-[10px] sm:text-sm text-white mt-1">{movesLeft}</p>}
+                {[...Array(2)].map((_, i) => (
+                    <span key={i} className={`inline-block w-2.5 h-2.5 rounded-full mx-0.5 ${i < roundWins ? 'bg-yellow-400 shadow-[0_0_4px_rgba(250,204,21,0.8)]' : 'bg-gray-600 border border-gray-500'}`}></span>
+                ))}
             </div>
         </div>
         <div className="mt-1 sm:mt-2 w-full bg-black h-4 sm:h-5 border border-black p-0.5 relative z-20">

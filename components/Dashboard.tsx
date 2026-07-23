@@ -30,19 +30,24 @@ import { Spinner } from './common/Spinner';
 import { toast } from 'react-toastify';
 import MembershipClaimModal from './common/MembershipClaimModal';
 import firebase from 'firebase/compat/app';
-import { DAILY_QUESTS } from '../constants';
-import PlayerRankDisplay from './common/PlayerRankDisplay';
+import { DAILY_QUESTS, BIRD_DEFINITIONS } from '../constants';
+
 import SeasonalEventModal from './common/SeasonalEventModal';
 import { useSettings } from '../hooks/useSettings';
 import EventsModal from './common/EventsModal';
-import { isWinterThemeActive } from '../utils/helpers';
+import { isWinterThemeActive, getRankInfo } from '../utils/helpers';
 import { useContentConfig } from '../hooks/useContentConfig';
 import Snowfall from './common/Snowfall';
 import CustomRoomModal from './common/CustomRoomModal';
-import BirdIcon from './common/BirdIcon';
+import LottieBird from './common/LottieBird';
 import { ReferralModal } from './common/ReferralModal';
 import { LimitedEventBanner } from './common/LimitedEventBanner';
 import { applyReferralCode } from '../services/referralService';
+
+import PingIndicator from './common/PingIndicator';
+import { checkAchievements, updateMatchStats } from '../services/achievementService';
+import AchievementModal from './common/AchievementModal';
+import type { Achievement } from '../services/achievementService';
 
 
 type Tab = 'CHALLENGE' | 'QUESTS' | 'BIRDS' | 'STORE' | 'ROYALE_PASS' | 'LUCK_ROYALE' | 'SOCIAL' | 'LEADERBOARD' | 'ESPORTS' | 'PROFILE';
@@ -142,6 +147,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const winterThemeActive = isWinterThemeActive();
   const [isCustomRoomModalOpen, setIsCustomRoomModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [achievementToShow, setAchievementToShow] = useState<Achievement | null>(null);
   
   const [hasUnreadGlobalMessages, setHasUnreadGlobalMessages] = useState(false);
 
@@ -297,6 +303,9 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     
     // Feature Locking Logic for NPE
     const playerLevel = playerData.level || 1;
+  const isNewPlayer = (playerData.totalMatches || 0) < 10;
+  const hasStarterPack = playerData.hasPurchasedStarterPack || false;
+
     const isSocialLocked = playerLevel < 3;
     const isEventsLocked = playerLevel < 5;
     const isEsportsLocked = playerLevel < 10;
@@ -328,55 +337,55 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             backgroundPosition: 'center'
         }}>
             {winterThemeActive && <Snowfall />}
-            {/* Header - Polished HUD - Reduced Padding */}
-            <header className="px-2 py-1 flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-black/40 backdrop-blur-md border-b border-white/10 z-10 shadow-lg">
-                {/* Player Info */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => setActiveTab('PROFILE')} className="flex items-center space-x-2 text-left hover:scale-105 transition-transform duration-200">
-                        <PlayerAvatar photoURL={playerData.photoURL} uid={playerData.uid} activeBadge={playerData.activeBadge} sizeClassName="w-10 h-10 md:w-12 md:h-12" imgClassName="border-2 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)] rounded-lg"/>
-                        <div>
-                            <h2 className="text-xs md:text-sm font-bold font-pixel whitespace-nowrap text-white drop-shadow-md">{playerData.displayName || 'Player'}</h2>
-                             <div className="w-20 h-3 bg-gray-900 border border-gray-600 rounded-full mt-0.5 relative overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-yellow-500 to-yellow-300 rounded-full" 
-                                  style={{ width: `${((playerData.xp || 0) / (playerData.xpToNextLevel || 100)) * 100}%` }}
-                                ></div>
-                                <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white uppercase tracking-wider drop-shadow-md">LVL {playerData.level || 1}</span>
+            {/* Header - Clean HUD */}
+            <header className="px-2 py-1.5 flex-shrink-0 flex items-center justify-between gap-2 bg-gradient-to-r from-black/60 via-black/40 to-black/60 backdrop-blur-md border-b border-white/10 z-10 shadow-lg">
+                {/* Left: Player Info */}
+                <div className="flex items-center gap-1.5">
+                    <button onClick={() => setActiveTab('PROFILE')} className="flex items-center gap-1.5 text-left hover:scale-105 transition-transform duration-200 flex-shrink-0 group">
+                        <PlayerAvatar photoURL={playerData.photoURL} uid={playerData.uid} activeBadge={playerData.activeBadge} sizeClassName="w-8 h-8 md:w-10 md:h-10" imgClassName="border-2 border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.4)] rounded-lg"/>
+                        <div className="hidden sm:block min-w-0">
+                            <h2 className="text-xs font-bold font-pixel text-white drop-shadow-md truncate max-w-[120px]">{playerData.displayName || 'Player'}</h2>
+                            <div className="w-14 h-2 bg-gray-900 border border-gray-600 rounded-full mt-0.5 relative overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-yellow-500 to-yellow-300 rounded-full" style={{ width: `${((playerData.xp || 0) / (playerData.xpToNextLevel || 100)) * 100}%` }}></div>
+                                <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-white drop-shadow-md">{playerData.level || 1}</span>
                             </div>
                         </div>
                     </button>
                     {primeLevel > 0 && <PrimeLevelDisplay level={primeLevel} />}
-                    <PlayerRankDisplay player={playerData} className="ml-1 scale-100" />
+                    <span className="text-xl drop-shadow-lg">{getRankInfo(playerData.rankPoints).tier.icon}</span>
                 </div>
 
-                {/* Actions and Currency */}
-                <div className="flex items-center justify-end flex-wrap gap-2 flex-grow">
-                    {isDailyClaimAvailable && <Button onClick={handleClaim} disabled={isClaiming} variant="success" className="!py-1 !px-2 !text-[10px] font-bold animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]">{isClaiming ? <Spinner /> : 'CLAIM'}</Button>}
-                    
-                    <div className="ff-currency-box text-yellow-400 !text-sm !py-1 !px-2">
-                        <span className="text-lg"><Coins size={18} /></span>
-                        <AnimatedNumber value={playerData.coins} />
+                {/* Right: Currency + Actions */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Coins */}
+                    <div className="flex items-center gap-1 bg-yellow-900/40 border border-yellow-600/40 rounded-lg px-2 py-1">
+                        <span className="text-yellow-400 text-sm font-bold">🪙</span>
+                        <span className="text-yellow-300 text-xs font-bold"><AnimatedNumber value={playerData.coins} /></span>
                     </div>
-                    
-                    <div className="ff-gem-box text-purple-400 !text-sm !py-1 !px-2 !pr-6">
-                        <span className="text-lg"><Gem size={18} /></span>
-                        <AnimatedNumber value={playerData.gems} />
-                        <button onClick={() => setIsTopUpModalOpen(true)} className="ff-topup-button" aria-label="Top up gems">+</button>
+                    {/* Gems */}
+                    <div className="flex items-center gap-1 bg-purple-900/40 border border-purple-500/40 rounded-lg px-2 py-1 relative">
+                        <span className="text-purple-400 text-sm font-bold">💎</span>
+                        <span className="text-purple-300 text-xs font-bold"><AnimatedNumber value={playerData.gems} /></span>
+                        <button onClick={() => setIsTopUpModalOpen(true)} className="absolute -top-1.5 -right-1.5 bg-purple-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow-lg hover:bg-purple-400 transition-colors">+</button>
                     </div>
 
-                    {isWeeklyActive && <div onClick={() => setMembershipModalInfo({ type: 'weekly' })} className="ff-membership-card glow-w text-base" title={`Weekly Pass Active. Expires: ${new Date(playerData.weeklyMembershipExpires!).toLocaleDateString()}`}>W</div>}
-                    {isMonthlyActive && <div onClick={() => setMembershipModalInfo({ type: 'monthly' })} className="ff-membership-card glow-m text-base" title={`Monthly Pass Active. Expires: ${new Date(playerData.monthlyMembershipExpires!).toLocaleDateString()}`}>M</div>}
-                    
-                    <div className="flex items-center gap-1 ml-1 bg-black/40 p-1 rounded-xl border border-white/10">
-                      <button onClick={handleToggleMailbox} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors relative group" aria-label="Mailbox">
-                          <MailIcon hasUnread={hasUnreadMail || hasUnreadGlobalNotifs} />
-                      </button>
-                      <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors" aria-label="Settings">
-                          <SettingsIcon />
-                      </button>
-                      <button onClick={() => auth.signOut()} className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors" aria-label="Logout">
-                          <LogoutIcon />
-                      </button>
+                    {isDailyClaimAvailable && (
+                        <button onClick={handleClaim} disabled={isClaiming} className="bg-green-600 text-white text-[9px] font-bold px-2 py-1 rounded-lg border border-green-400 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.3)]">{isClaiming ? <Spinner /> : '🎁'}</button>
+                    )}
+
+                    {/* Ping indicator in header */}
+                    <PingIndicator />
+
+                    <div className="flex items-center gap-0.5 ml-0.5 bg-black/50 p-1 rounded-lg border border-white/10">
+                        <button onClick={handleToggleMailbox} className="p-1 rounded hover:bg-white/10 transition-colors" aria-label="Mailbox">
+                            <MailIcon hasUnread={hasUnreadMail || hasUnreadGlobalNotifs} />
+                        </button>
+                        <button onClick={() => setIsSettingsOpen(true)} className="p-1 rounded hover:bg-white/10 transition-colors" aria-label="Settings">
+                            <SettingsIcon />
+                        </button>
+                        <button onClick={() => auth.signOut()} className="p-1 rounded hover:bg-red-500/20 text-red-400 transition-colors" aria-label="Logout">
+                            <LogoutIcon />
+                        </button>
                     </div>
                 </div>
             </header>
@@ -399,16 +408,14 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                 {/* Central Content Area - Reduced Bird Scale and Padding */}
                 <div className="flex-grow flex flex-col gap-1 p-1 overflow-hidden relative">
                     <LimitedEventBanner onEventClick={(event) => toast.info(`${event.title}: ${event.description}`)} />
-                    <div className="flex-grow flex items-center justify-center bird-float pseudo-3d relative bird-idle">
+                     <div className="flex-grow flex items-center justify-center relative">
                         {equippedBird ? (
                             <div className="text-center group">
-                                <div className="pseudo-3d-bird-icon transform transition-transform duration-500 group-hover:scale-110">
-                                    <BirdIcon 
-                                        bird={equippedBird} 
-                                        className="icon !text-[6rem] md:!text-[10rem] lg:!text-[12rem]"
-                                        imgClassName="w-32 h-32 md:w-48 md:h-48 lg:w-64 lg:h-64 object-contain drop-shadow-[0_20px_20px_rgba(0,0,0,0.6)]"
-                                    />
-                                </div>
+                                <LottieBird
+                                    bird={equippedBird}
+                                    size="xl"
+                                    animated={true}
+                                />
                                 <h2 className="name !text-xl sm:!text-3xl mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{equippedBird.name}</h2>
                             </div>
                         ) : (
@@ -422,20 +429,13 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                     {/* Controls and Buttons - Compact */}
                     <div className="flex-shrink-0 max-w-sm mx-auto w-full flex flex-col justify-center items-center gap-2 p-2 mb-2">
                         <div className="w-full p-2 bg-black/70 backdrop-blur-md space-y-2 border border-yellow-500/30 rounded-xl shadow-2xl">
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                                 <button
                                     onClick={() => setSelectedMode('rank')}
                                     className={`p-1.5 border-2 rounded-lg transition-all duration-200 ${selectedMode === 'rank' ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.3)]' : 'bg-black/40 border-gray-600 hover:border-gray-400 hover:bg-black/60'}`}
                                 >
                                     <p className="font-pixel text-xs md:text-sm text-white">RANKED</p>
                                     <p className="text-[9px] text-gray-300 font-bold uppercase tracking-wider">1v1 Battle</p>
-                                </button>
-                                <button
-                                    onClick={() => setSelectedMode('squad')}
-                                    className={`p-1.5 border-2 rounded-lg transition-all duration-200 ${selectedMode === 'squad' ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.3)]' : 'bg-black/40 border-gray-600 hover:border-gray-400 hover:bg-black/60'}`}
-                                >
-                                    <p className="font-pixel text-xs md:text-sm text-white">SQUAD</p>
-                                    <p className="text-[9px] text-gray-300 font-bold uppercase tracking-wider">2v2 Battle</p>
                                 </button>
                                 <button
                                     onClick={() => setSelectedMode('minigame')}
@@ -458,13 +458,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                                     onClick={() => {
                                         if (selectedMode === 'rank') {
                                             handleStartSoloMatchmaking();
-                                        } else if (selectedMode === 'squad') {
-                                            if (playerData.dynamicDuo?.status === 'active') {
-                                                handleStartSoloMatchmaking();
-                                                toast.info("Squad mode: inviting duo partner...");
-                                            } else {
-                                                toast.info("You need an active Dynamic Duo to play Squad mode! Go to Social tab.");
-                                            }
                                         } else if (selectedMode === 'minigame') {
                                             props.onStartMinigame();
                                         }
@@ -477,6 +470,25 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             </div>
 
                             {matchmakingError && <p className="text-red-400 text-[10px] font-bold text-center bg-red-900/30 p-0.5 rounded">{matchmakingError}</p>}
+
+                            {/* Quick Actions Row */}
+                            <div className="flex gap-2 items-center justify-center pt-1 flex-wrap">
+                              {isNewPlayer && (
+                                <div className="relative group">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-bold bg-gradient-to-r from-green-900/60 to-emerald-900/60 px-3 py-1.5 rounded-full border border-green-500/40 text-green-300 shadow-[0_0_10px_rgba(74,222,128,0.15)]">
+                                    <span className="relative flex h-2 w-2">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                    </span>
+                                    🤖 Bot Protected
+                                    <span className="bg-green-600 text-white px-1.5 py-0.5 rounded-full text-[8px]">{10 - (playerData.totalMatches || 0)}</span>
+                                  </div>
+                                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/90 text-[10px] text-white px-2 py-1 rounded border border-green-500/30 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                    First 10 matches are against bots
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -495,7 +507,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             <h2 className="font-pixel text-lg sm:text-xl text-yellow-400 tracking-wider drop-shadow-sm">{activeTab.replace('_', ' ')}</h2>
                             <button onClick={() => setActiveTab('CHALLENGE')} className="text-2xl hover:text-yellow-400 transition-colors text-gray-400">&times;</button>
                         </div>
-                        <div className="flex-grow overflow-hidden flex flex-col p-1 sm:p-2 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+                        <div className="flex-grow overflow-y-auto flex flex-col p-1 sm:p-2 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
                             {renderPanelContent()}
                         </div>
                     </div>
@@ -523,6 +535,12 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                         await applyReferralCode(playerData.uid, code);
                     }}
                 />
+            )}
+            {achievementToShow && (
+              <AchievementModal
+                achievement={achievementToShow}
+                onClose={() => setAchievementToShow(null)}
+              />
             )}
         </div>
     );

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Bird } from '../../types';
 import { useContentConfig } from '../../hooks/useContentConfig';
+import BirdAvatar from './BirdAvatar';
 
 interface BirdIconProps {
     bird: Bird | { id: string, icon: string, name: string };
@@ -19,15 +20,17 @@ const BirdIcon: React.FC<BirdIconProps> = ({ bird, className, imgClassName, styl
                 src={imageUrl} 
                 alt={bird.name}
                 className={`${className} ${imgClassName} object-contain`}
-                style={{ ...style, imageRendering: 'auto' }} // Override pixelated rendering for custom images
+                style={{ ...style, imageRendering: 'auto' }}
             />
         );
     }
+
+    const size = className?.includes('text-[6rem]') ? 120 : className?.includes('text-5xl') ? 80 : 64;
     
     return (
-        <span className={className} style={style}>
-            {bird.icon}
-        </span>
+        <div className={`inline-flex items-center justify-center ${className}`} style={style}>
+            <BirdAvatar bird={bird} size={size} />
+        </div>
     );
 };
 

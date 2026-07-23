@@ -21,7 +21,7 @@ const GoogleIcon: React.FC = () => (
 const GameLogo: React.FC = () => (
     <svg 
         viewBox="0 0 512 512" 
-        className="w-32 h-32 sm:w-48 sm:h-48 mb-4 animate-bounce drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
+        className="w-16 h-16 sm:w-24 sm:h-24 mb-2 animate-bounce drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
         xmlns="http://www.w3.org/2000/svg"
     >
         <defs>
@@ -152,17 +152,13 @@ const AuthScreen: React.FC = () => {
   return (
     <div className="flex flex-col sm:flex-row h-full w-full overflow-hidden bg-gray-900">
       
-      {/* Left Side: Branding / Hero (Top on portrait mobile, Left on landscape) */}
-      <div className="w-full h-1/4 sm:h-full sm:w-5/12 lg:w-1/2 relative flex items-center justify-center bg-black overflow-hidden flex-shrink-0">
-          {/* Server & Version Info (Top Left of Hero Section) */}
-          <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-20 flex flex-col items-start pointer-events-none select-none">
-              <div className="bg-black/40 backdrop-blur-sm px-3 py-2 border border-yellow-400/30 rounded-md shadow-lg">
-                <p className="font-pixel text-[10px] sm:text-xs text-yellow-400 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                    🇧🇩 BD SERVER
-                </p>
-                <p className="font-pixel text-[8px] sm:text-[10px] text-gray-300 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] mt-0.5">
-                    GAME VER: v{patchVersion}.0
-                </p>
+      {/* Compact Hero Banner */}
+      <div className="w-full h-auto min-h-[30%] sm:h-full sm:w-5/12 lg:w-1/2 relative flex items-center justify-center bg-black overflow-hidden flex-shrink-0">
+          {/* Server & Version Info */}
+          <div className="absolute top-2 left-2 z-20">
+              <div className="bg-black/40 backdrop-blur-sm px-2 py-1 border border-yellow-400/30 rounded-md shadow-lg">
+                <p className="font-pixel text-[8px] text-yellow-400">🇧🇩 BD SERVER</p>
+                <p className="font-pixel text-[7px] text-gray-300">VER: v{patchVersion}.0</p>
               </div>
           </div>
 
@@ -174,31 +170,31 @@ const AuthScreen: React.FC = () => {
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-transparent via-black/20 to-gray-900" />
           
-          {/* Hero Content */}
-          <div className="relative z-10 text-center p-4 transform scale-75 sm:scale-100 screen-enter">
+          {/* Hero Content - Compact for portrait */}
+          <div className="relative z-10 text-center flex flex-col items-center justify-center py-2 screen-enter">
              <GameLogo />
-             <h1 className="text-3xl sm:text-5xl font-pixel text-yellow-400 leading-tight" style={{ textShadow: '4px 4px 0 #000, 0 0 20px rgba(250,204,21,0.5)' }}>
-                BIRD<br/>CLASH<br/>FEVER
+             <h1 className="text-xl sm:text-4xl font-pixel text-yellow-400 leading-tight" style={{ textShadow: '4px 4px 0 #000, 0 0 20px rgba(250,204,21,0.5)' }}>
+                BIRD CLASH FEVER
              </h1>
-             <p className="hidden sm:block mt-4 text-sm sm:text-xl text-white font-bold tracking-[0.3em] uppercase opacity-90 text-shadow-sm">
+             <p className="hidden sm:block mt-2 text-sm sm:text-lg text-white font-bold tracking-[0.3em] uppercase opacity-90">
                 Enter the Arena
              </p>
           </div>
       </div>
 
-      {/* Right Side: Login Form (Bottom on portrait mobile, Right on landscape) */}
-      <div className="w-full h-3/4 sm:h-full sm:w-7/12 lg:w-1/2 bg-gray-900 flex items-center justify-center p-4 relative">
+      {/* Login Form */}
+      <div className="w-full flex-1 sm:w-7/12 lg:w-1/2 bg-gray-900 flex items-center justify-center p-4 relative overflow-y-auto">
          {/* Subtle pattern background for the form side */}
          <div className="absolute inset-0 opacity-5 pointer-events-none" 
               style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }}>
          </div>
 
          <div className="w-full max-w-xs sm:max-w-sm z-10 relative screen-enter">
-            <div className="bg-gray-800/50 backdrop-blur-sm p-5 sm:p-8 rounded-2xl border border-gray-700 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.5)]">
-                <h2 className="text-xl sm:text-2xl font-bold text-white mb-1 text-center">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-                <p className="text-center text-gray-400 text-xs mb-4 sm:mb-6">{isLogin ? 'Sign in to continue your journey' : 'Join the battle today!'}</p>
+            <div className="bg-gray-800/50 backdrop-blur-sm p-4 sm:p-6 rounded-xl border border-gray-700 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.5)]">
+                <h2 className="text-lg sm:text-2xl font-bold text-white mb-0.5 text-center">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+                <p className="text-center text-gray-400 text-[10px] mb-3 sm:mb-4">{isLogin ? 'Sign in to continue your journey' : 'Join the battle today!'}</p>
 
-                <form onSubmit={handleEmailAuth} className="space-y-3">
+                <form onSubmit={handleEmailAuth} className="space-y-2">
                     {!isLogin && (
                         <div className="relative group">
                             <input
@@ -206,7 +202,7 @@ const AuthScreen: React.FC = () => {
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
                                 placeholder="Username"
-                                className="pixel-input w-full pl-3 pr-3 py-2 bg-gray-900/80 border-gray-600 focus:border-yellow-400 transition-colors rounded-lg text-sm"
+                                className="pixel-input w-full pl-3 pr-3 py-1.5 bg-gray-900/80 border-gray-600 focus:border-yellow-400 transition-colors rounded-lg text-xs"
                                 required
                             />
                         </div>
@@ -217,7 +213,7 @@ const AuthScreen: React.FC = () => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="Email Address"
-                            className="pixel-input w-full pl-3 pr-3 py-2 bg-gray-900/80 border-gray-600 focus:border-yellow-400 transition-colors rounded-lg text-sm"
+                            className="pixel-input w-full pl-3 pr-3 py-1.5 bg-gray-900/80 border-gray-600 focus:border-yellow-400 transition-colors rounded-lg text-xs"
                             required
                         />
                     </div>
@@ -227,7 +223,7 @@ const AuthScreen: React.FC = () => {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="Password"
-                            className="pixel-input w-full pl-3 pr-3 py-2 bg-gray-900/80 border-gray-600 focus:border-yellow-400 transition-colors rounded-lg text-sm"
+                            className="pixel-input w-full pl-3 pr-3 py-1.5 bg-gray-900/80 border-gray-600 focus:border-yellow-400 transition-colors rounded-lg text-xs"
                             required
                         />
                     </div>
@@ -235,31 +231,31 @@ const AuthScreen: React.FC = () => {
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full !py-2.5 !text-sm !font-bold !rounded-lg shadow-lg mt-2"
+                        className="w-full !py-1.5 !text-xs !font-bold !rounded-lg shadow-lg mt-1"
                         variant="primary"
                     >
                         {loading ? <span className="animate-pulse">Loading...</span> : (isLogin ? 'LOGIN' : 'SIGN UP')}
                     </Button>
                 </form>
 
-                {error && <div className="mt-3 p-2 bg-red-900/30 border border-red-500/50 rounded text-red-300 text-xs text-center">{error}</div>}
+                {error && <div className="mt-2 p-1.5 bg-red-900/30 border border-red-500/50 rounded text-red-300 text-[10px] text-center">{error}</div>}
                 
-                <div className="flex items-center justify-center mt-3 mb-3">
-                    <button onClick={toggleAuthMode} className="text-xs text-blue-400 hover:text-blue-300 transition-colors hover:underline">
+                <div className="flex items-center justify-center mt-2 mb-2">
+                    <button onClick={toggleAuthMode} className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors hover:underline">
                         {isLogin ? 'New here? Create an account' : 'Already have an account? Login'}
                     </button>
                 </div>
 
-                <div className="relative flex items-center py-2">
+                <div className="relative flex items-center py-1">
                     <div className="flex-grow border-t border-gray-700"></div>
-                    <span className="flex-shrink mx-3 text-gray-500 text-[10px] uppercase tracking-wider">Or continue with</span>
+                    <span className="flex-shrink mx-3 text-gray-500 text-[9px] uppercase tracking-wider">Or continue with</span>
                     <div className="flex-grow border-t border-gray-700"></div>
                 </div>
                 
                 <Button
                     onClick={handleGoogleSignIn}
                     disabled={loading}
-                    className="w-full flex items-center justify-center !py-2.5 !text-sm !bg-white !text-black hover:!bg-gray-200 !border-none !rounded-lg shadow-md"
+                    className="w-full flex items-center justify-center !py-1.5 !text-xs !bg-white !text-black hover:!bg-gray-200 !border-none !rounded-lg shadow-md"
                     variant="secondary"
                 >
                     <GoogleIcon />
