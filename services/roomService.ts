@@ -48,44 +48,39 @@ export const createRoom = async (player: Player, roomType: 'normal' | 'esports')
 export const joinRoom = async (player: Player, roomId: string): Promise<CustomRoom> => {
     const roomRef = roomsRef.child(roomId);
 
-    // First check the room exists at all
-    const existingSnap = await roomRef.once('value');
-    if (!existingSnap.exists()) {
+    // Read the current room data
+    const snap = await roomRef.once('value');
+    if (!snap.exists()) {
         throw new Error("Room not found. Check the Room ID.");
     }
-    const existingRoom = existingSnap.val() as CustomRoom;
-    if (existingRoom.status !== 'waiting') {
+    const room = snap.val() as CustomRoom;
+    if (room.status !== 'waiting') {
         throw new Error("Room is closed or already has a guest.");
     }
-    if (existingRoom.hostUid === player.uid) {
-        // Host rejoining their own room — just return it
-        return existingRoom;
+    if (room.hostUid === player.uid) {
+        return room;
+    }
+    if (room.guestUid) {
+        throw new Error("Room already has a guest.");
     }
 
-    // Atomically update guest fields + status
-    const { committed, snapshot } = await roomRef.transaction(room => {
-        if (!room) return; // aborted
-        if (room.status !== 'waiting') return; // aborted
-        if (room.guestUid) return; // already has a guest
-
-        room.guestUid = player.uid;
-        room.guestDisplayName = player.displayName;
-        room.guestPhotoURL = player.photoURL;
-        room.status = 'full';
-        return room;
+    // Directly update the room
+    await roomRef.update({
+        guestUid: player.uid,
+        guestDisplayName: player.displayName,
+        guestPhotoURL: player.photoURL,
+        status: 'full',
     });
 
-    if (!committed || !snapshot.exists()) {
-        throw new Error("Failed to join room. It may have been taken already.");
-    }
-
-    // Set onDisconnect for the guest
+    // Set onDisconnect cleanup for the guest
     roomRef.child('guestUid').onDisconnect().set(null);
     roomRef.child('guestDisplayName').onDisconnect().set(null);
     roomRef.child('guestPhotoURL').onDisconnect().set(null);
     roomRef.child('status').onDisconnect().set('waiting');
 
-    return snapshot.val() as CustomRoom;
+    // Return updated room
+    const updatedSnap = await roomRef.once('value');
+    return updatedSnap.val() as CustomRoom;
 };
 
 // Leave a room
