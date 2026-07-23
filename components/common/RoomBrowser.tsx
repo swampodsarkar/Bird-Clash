@@ -25,6 +25,10 @@ const RoomBrowser: React.FC<RoomBrowserProps> = ({ player, onEnterRoom, onBack }
   const [joinRoomId, setJoinRoomId] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
 
+  // Password prompt for locked rooms
+  const [passwordPromptRoom, setPasswordPromptRoom] = useState<CustomRoom | null>(null);
+  const [promptPassword, setPromptPassword] = useState('');
+
   useEffect(() => {
     const unsub = roomService.listenToAllRooms(setRooms);
     return unsub;
@@ -61,15 +65,29 @@ const RoomBrowser: React.FC<RoomBrowserProps> = ({ player, onEnterRoom, onBack }
 
   const handleQuickJoin = async (room: CustomRoom) => {
     if (room.password) {
-      setJoinRoomId(room.id);
-      setShowJoin(true);
-      toast.info('This room has a password. Enter it below.');
+      setPasswordPromptRoom(room);
+      setPromptPassword('');
       return;
     }
     setLoading(true);
     try {
       const joined = await roomService.joinRoom(player, room.id);
       toast.success('Joined room!');
+      onEnterRoom(joined);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordJoin = async () => {
+    if (!passwordPromptRoom) return;
+    setLoading(true);
+    try {
+      const joined = await roomService.joinRoom(player, passwordPromptRoom.id, promptPassword.trim());
+      toast.success('Joined room!');
+      setPasswordPromptRoom(null);
       onEnterRoom(joined);
     } catch (e: any) {
       toast.error(e.message);
@@ -119,12 +137,12 @@ const RoomBrowser: React.FC<RoomBrowserProps> = ({ player, onEnterRoom, onBack }
             </div>
             <div className="shrink-0">
               {room.password ? (
-                <button className="text-xs bg-yellow-600 hover:bg-yellow-700 px-3 py-1 rounded font-bold" onClick={e => { e.stopPropagation(); setJoinRoomId(room.id); setShowJoin(true); }}>
+                <button className="text-xs bg-yellow-600 hover:bg-yellow-700 px-3 py-1 rounded font-bold" onClick={e => { e.stopPropagation(); setPasswordPromptRoom(room); setPromptPassword(''); }}>
                   🔑 Join
                 </button>
               ) : (
                 <button className="text-xs bg-green-600 hover:bg-green-700 px-3 py-1 rounded font-bold" onClick={e => { e.stopPropagation(); handleQuickJoin(room); }}>
-                  Quick Join
+                  Join
                 </button>
               )}
             </div>
@@ -166,6 +184,29 @@ const RoomBrowser: React.FC<RoomBrowserProps> = ({ player, onEnterRoom, onBack }
               />
               <Button onClick={handleCreate} disabled={loading} className="w-full">{loading ? <Spinner/> : 'Create Room'}</Button>
               <button onClick={() => setShowCreate(false)} className="w-full text-xs text-gray-400 hover:underline">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Prompt for Locked Rooms */}
+      {passwordPromptRoom && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setPasswordPromptRoom(null)}>
+          <div className="w-full max-w-sm p-4 bg-[#2c2c54] border-2 border-black" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-center mb-1 text-yellow-400">🔑 Password Required</h3>
+            <p className="text-xs text-gray-400 text-center mb-3">Room: {passwordPromptRoom.hostDisplayName}</p>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={promptPassword}
+                onChange={e => setPromptPassword(e.target.value)}
+                placeholder="Enter room password"
+                className="pixel-input text-center text-sm"
+                maxLength={10}
+                autoFocus
+              />
+              <Button onClick={handlePasswordJoin} disabled={loading} className="w-full">{loading ? <Spinner/> : 'Join Room'}</Button>
+              <button onClick={() => setPasswordPromptRoom(null)} className="w-full text-xs text-gray-400 hover:underline">Cancel</button>
             </div>
           </div>
         </div>
