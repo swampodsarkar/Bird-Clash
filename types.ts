@@ -391,6 +391,12 @@ export interface RoomInvite {
     activeBadge?: 'Owner' | 'Moderator' | 'Content Creator';
 }
 
+export interface RoomSpectator {
+  uid: string;
+  displayName: string;
+  photoURL: string | null;
+}
+
 export interface CustomRoom {
   id: string;
   hostUid: string;
@@ -399,11 +405,12 @@ export interface CustomRoom {
   guestUid: string | null;
   guestDisplayName: string | null;
   guestPhotoURL: string | null;
-  status: 'waiting' | 'full';
+  status: 'waiting' | 'full' | 'in_game';
   roomType: 'normal' | 'esports';
   matchId: string | null;
   password?: string;
   createdAt: number;
+  spectators?: RoomSpectator[];
 }
 
 export interface Friend {

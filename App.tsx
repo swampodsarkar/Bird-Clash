@@ -188,26 +188,30 @@ const Game: React.FC = () => {
   // Listen for current room changes
   useEffect(() => {
     if (!currentRoom) return;
+    const currentPlayerUid = user?.uid;
 
     const unsubscribe = roomService.listenToRoom(currentRoom.id, (updatedRoom) => {
         if (updatedRoom) {
             setCurrentRoom(updatedRoom);
             if(updatedRoom.matchId) {
-                // Match has started, let's join
+                const isPlayer = currentPlayerUid === updatedRoom.hostUid || currentPlayerUid === updatedRoom.guestUid;
                 rtdb.ref(`matches/${updatedRoom.matchId}`).once('value').then(snapshot => {
                     if (snapshot.exists()) {
-                        handleMatchFound(snapshot.val());
+                        if (isPlayer) {
+                            handleMatchFound(snapshot.val());
+                        } else {
+                            handleStartSpectating(updatedRoom.matchId!);
+                        }
                     }
                 });
             }
         } else {
-            // Room was deleted (e.g., host left)
             toast.info("The room was closed by the host.");
             handleLeaveRoom();
         }
     });
     return () => unsubscribe();
-  }, [currentRoom?.id]);
+  }, [currentRoom?.id, user?.uid]);
 
 
   useEffect(() => {

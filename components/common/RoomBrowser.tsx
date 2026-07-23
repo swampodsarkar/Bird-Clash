@@ -69,10 +69,27 @@ const RoomBrowser: React.FC<RoomBrowserProps> = ({ player, onEnterRoom, onBack }
       setPromptPassword('');
       return;
     }
+    if (room.status === 'full' && room.guestUid) {
+      // Room is full — join as spectator
+      return handleJoinAsSpectator(room);
+    }
     setLoading(true);
     try {
       const joined = await roomService.joinRoom(player, room.id);
       toast.success('Joined room!');
+      onEnterRoom(joined);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleJoinAsSpectator = async (room: CustomRoom) => {
+    setLoading(true);
+    try {
+      const joined = await roomService.joinAsSpectator(player, room.id);
+      toast.success('Joined as spectator!');
       onEnterRoom(joined);
     } catch (e: any) {
       toast.error(e.message);
@@ -131,12 +148,18 @@ const RoomBrowser: React.FC<RoomBrowserProps> = ({ player, onEnterRoom, onBack }
                 <p className="font-bold text-sm truncate">{room.hostDisplayName}</p>
                 <div className="flex items-center gap-2 text-[10px] text-gray-400">
                   <span>{room.roomType === 'esports' ? '🏆 Esports' : '✉️ Normal'}</span>
+                  <span>{room.guestUid ? '👥 2/2' : '👤 1/2'}</span>
+                  {room.spectators && room.spectators.length > 0 && <span>👁 {room.spectators.length}</span>}
                   {room.password && <span className="text-yellow-500">🔒 Locked</span>}
                 </div>
               </div>
             </div>
             <div className="shrink-0">
-              {room.password ? (
+              {room.status === 'full' ? (
+                <button className="text-xs bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded font-bold" onClick={e => { e.stopPropagation(); handleJoinAsSpectator(room); }}>
+                  👁 Spectate
+                </button>
+              ) : room.password ? (
                 <button className="text-xs bg-yellow-600 hover:bg-yellow-700 px-3 py-1 rounded font-bold" onClick={e => { e.stopPropagation(); setPasswordPromptRoom(room); setPromptPassword(''); }}>
                   🔑 Join
                 </button>
