@@ -129,8 +129,8 @@ export const findMatch = async (
 
           newMatch = {
             id: matchId,
-            player1: { uid: player.uid, displayName: player.displayName, photoURL: player.photoURL, damageDealt: 0, rankPoints: playerData.rankPoints, clanId: playerData.clanId || null, clanTag: myClanTag, selectedBird: myBird, currentHealth: myBird.maxHealth, activeBadge: playerData.activeBadge || null, equippedEmotes: player.equippedEmotes || [], ultimateCooldownLeft: myBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, potions: playerData.inventory?.potions || {} },
-            player2: { uid: opponentData.uid, displayName: opponentData.displayName, photoURL: opponentData.photoURL, damageDealt: 0, rankPoints: opponentData.rankPoints, clanId: opponentData.clanId || null, clanTag: opponentClanTag, selectedBird: opponentBird, currentHealth: opponentBird.maxHealth, activeBadge: opponentData.activeBadge || null, equippedEmotes: opponentData.equippedEmotes || [], ultimateCooldownLeft: opponentBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, potions: opponentData.inventory?.potions || {} },
+            player1: { uid: player.uid, displayName: player.displayName, photoURL: player.photoURL, damageDealt: 0, rankPoints: playerData.rankPoints, clanId: playerData.clanId || null, clanTag: myClanTag, selectedBird: myBird, currentHealth: myBird.maxHealth, activeBadge: playerData.activeBadge || null, equippedEmotes: player.equippedEmotes || [], ultimateCooldownLeft: myBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, perfectMeter: 0, potions: playerData.inventory?.potions || {} },
+            player2: { uid: opponentData.uid, displayName: opponentData.displayName, photoURL: opponentData.photoURL, damageDealt: 0, rankPoints: opponentData.rankPoints, clanId: opponentData.clanId || null, clanTag: opponentClanTag, selectedBird: opponentBird, currentHealth: opponentBird.maxHealth, activeBadge: opponentData.activeBadge || null, equippedEmotes: opponentData.equippedEmotes || [], ultimateCooldownLeft: opponentBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, perfectMeter: 0, potions: opponentData.inventory?.potions || {} },
             status: 'active',
             winner: null,
             createdAt: Date.now(),
@@ -168,10 +168,10 @@ export const findMatch = async (
 
           newMatch = {
             id: matchId,
-            player1: { uid: player.uid, displayName: player.displayName, photoURL: player.photoURL, damageDealt: 0, rankPoints: playerData.rankPoints, clanId: playerData.clanId || null, clanTag: myClanTag, selectedBird: myBird, currentHealth: myBird.maxHealth, activeBadge: playerData.activeBadge || null, equippedEmotes: player.equippedEmotes || [], ultimateCooldownLeft: myBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, potions: playerData.inventory?.potions || {} },
-            player2: { uid: p2Data.uid, displayName: p2Data.displayName, photoURL: p2Data.photoURL, damageDealt: 0, rankPoints: p2Data.rankPoints, clanId: p2Data.clanId || null, clanTag: p2ClanTag, selectedBird: p2Bird, currentHealth: p2Bird.maxHealth, activeBadge: p2Data.activeBadge || null, equippedEmotes: p2Data.equippedEmotes || [], ultimateCooldownLeft: p2Bird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, potions: p2Data.inventory?.potions || {} },
-            player3: { uid: p3Data.uid, displayName: p3Data.displayName, photoURL: p3Data.photoURL, damageDealt: 0, rankPoints: p3Data.rankPoints, clanId: p3Data.clanId || null, clanTag: p3ClanTag, selectedBird: p3Bird, currentHealth: p3Bird.maxHealth, activeBadge: p3Data.activeBadge || null, equippedEmotes: p3Data.equippedEmotes || [], ultimateCooldownLeft: p3Bird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, potions: p3Data.inventory?.potions || {} },
-            player4: { uid: p4Data.uid, displayName: p4Data.displayName, photoURL: p4Data.photoURL, damageDealt: 0, rankPoints: p4Data.rankPoints, clanId: p4Data.clanId || null, clanTag: p4ClanTag, selectedBird: p4Bird, currentHealth: p4Bird.maxHealth, activeBadge: p4Data.activeBadge || null, equippedEmotes: p4Data.equippedEmotes || [], ultimateCooldownLeft: p4Bird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, potions: p4Data.inventory?.potions || {} },
+            player1: { uid: player.uid, displayName: player.displayName, photoURL: player.photoURL, damageDealt: 0, rankPoints: playerData.rankPoints, clanId: playerData.clanId || null, clanTag: myClanTag, selectedBird: myBird, currentHealth: myBird.maxHealth, activeBadge: playerData.activeBadge || null, equippedEmotes: player.equippedEmotes || [], ultimateCooldownLeft: myBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, perfectMeter: 0, potions: playerData.inventory?.potions || {} },
+            player2: { uid: p2Data.uid, displayName: p2Data.displayName, photoURL: p2Data.photoURL, damageDealt: 0, rankPoints: p2Data.rankPoints, clanId: p2Data.clanId || null, clanTag: p2ClanTag, selectedBird: p2Bird, currentHealth: p2Bird.maxHealth, activeBadge: p2Data.activeBadge || null, equippedEmotes: p2Data.equippedEmotes || [], ultimateCooldownLeft: p2Bird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, perfectMeter: 0, potions: p2Data.inventory?.potions || {} },
+            player3: { uid: p3Data.uid, displayName: p3Data.displayName, photoURL: p3Data.photoURL, damageDealt: 0, rankPoints: p3Data.rankPoints, clanId: p3Data.clanId || null, clanTag: p3ClanTag, selectedBird: p3Bird, currentHealth: p3Bird.maxHealth, activeBadge: p3Data.activeBadge || null, equippedEmotes: p3Data.equippedEmotes || [], ultimateCooldownLeft: p3Bird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, perfectMeter: 0, potions: p3Data.inventory?.potions || {} },
+            player4: { uid: p4Data.uid, displayName: p4Data.displayName, photoURL: p4Data.photoURL, damageDealt: 0, rankPoints: p4Data.rankPoints, clanId: p4Data.clanId || null, clanTag: p4ClanTag, selectedBird: p4Bird, currentHealth: p4Bird.maxHealth, activeBadge: p4Data.activeBadge || null, equippedEmotes: p4Data.equippedEmotes || [], ultimateCooldownLeft: p4Bird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, perfectMeter: 0, potions: p4Data.inventory?.potions || {} },
             team1_uids: [player.uid, p2Data.uid],
             team2_uids: [p3Data.uid, p4Data.uid],
             status: 'active',
@@ -278,6 +278,7 @@ export const createBotMatch = async (player: Player, selectedBird: Bird): Promis
         currentHealth: botBird.maxHealth,
         isBot: true,
         equippedEmotes: ['🤖', '🔥', '💀', '👎'],
+        perfectMeter: 0,
     };
 
     const myClanTag = await getClanTag(player.clanId);
@@ -297,8 +298,8 @@ export const createBotMatch = async (player: Player, selectedBird: Bird): Promis
     const matchId = `match_bot_${Date.now()}`;
     const newMatch: Match = {
         id: matchId,
-        player1: { uid: player.uid, displayName: player.displayName, photoURL: player.photoURL, damageDealt: 0, rankPoints: player.rankPoints, clanId: player.clanId || null, clanTag: myClanTag, selectedBird: myBird, currentHealth: myBird.maxHealth, activeBadge: player.activeBadge || null, equippedEmotes: player.equippedEmotes || [], ultimateCooldownLeft: myBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, potions: player.inventory?.potions || {} },
-        player2: { ...botPlayer, abilityUsesLeft: 2, wins: 0, ultimateCooldownLeft: botBird.ultimateCooldown || 0, potions: {} },
+        player1: { uid: player.uid, displayName: player.displayName, photoURL: player.photoURL, damageDealt: 0, rankPoints: player.rankPoints, clanId: player.clanId || null, clanTag: myClanTag, selectedBird: myBird, currentHealth: myBird.maxHealth, activeBadge: player.activeBadge || null, equippedEmotes: player.equippedEmotes || [], ultimateCooldownLeft: myBird.ultimateCooldown || 0, abilityUsesLeft: 2, wins: 0, perfectMeter: 0, potions: player.inventory?.potions || {} },
+        player2: { ...botPlayer, abilityUsesLeft: 2, wins: 0, ultimateCooldownLeft: botBird.ultimateCooldown || 0, perfectMeter: 0, potions: {} },
         status: 'active',
         winner: null,
         createdAt: Date.now(),
@@ -442,46 +443,6 @@ export const autoPassTurn = async (matchId: string) => {
         const opponentKey = meKey === 'player1' ? 'player2' : 'player1';
         if (!currentData.log) currentData.log = [];
         currentData.log.push(`${currentData[meKey].displayName}'s turn timed out!`);
-        const MAX_TURNS = 10;
-        if (currentData.turn >= MAX_TURNS) {
-            const p1Health = currentData.player1.currentHealth;
-            const p2Health = currentData.player2.currentHealth;
-            if (p1Health > p2Health || p2Health > p1Health) {
-                const winnerKey = p1Health > p2Health ? 'player1' : 'player2';
-                const loserKey = winnerKey === 'player1' ? 'player2' : 'player1';
-                const winnerUid = currentData[winnerKey].uid;
-                currentData[winnerKey].wins = (currentData[winnerKey].wins || 0) + 1;
-                if (!currentData.rounds) currentData.rounds = [];
-                currentData.rounds.push({ roundNumber: currentData.currentRound || 1, winner: winnerUid, player1Health: p1Health, player2Health: p2Health });
-                currentData.log.push(`${currentData[winnerKey].displayName} wins Round ${currentData.currentRound} by health!`);
-                if (currentData[winnerKey].wins >= 2) {
-                    currentData.winner = winnerUid;
-                    currentData.status = 'finished';
-                    currentData.log.push(`${currentData[winnerKey].displayName} wins the match ${currentData[winnerKey].wins}-${currentData[loserKey].wins || 0}!`);
-                    return currentData;
-                }
-                currentData.currentRound = (currentData.currentRound || 1) + 1;
-                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
-                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
-                currentData.player1.activeEffects = {};
-                currentData.player2.activeEffects = {};
-                currentData.turn = 1;
-                currentData.currentTurnPlayerUid = currentData[loserKey].uid;
-                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
-                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
-            } else {
-                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
-                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
-                currentData.player1.activeEffects = {};
-                currentData.player2.activeEffects = {};
-                currentData.turn = 1;
-                currentData.currentRound = (currentData.currentRound || 1) + 1;
-                currentData.currentTurnPlayerUid = currentData.player1.uid;
-                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
-                currentData.log.push(`Round draw! Starting Round ${currentData.currentRound}...`);
-            }
-            return currentData;
-        }
         currentData.turn += 1;
         currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
         currentData.turnTimer = {
@@ -507,8 +468,8 @@ export const createPrivateMatch = async (inviter: Player, inviteeUid: string): P
 
     const newMatch: Match = {
         id: matchId,
-        player1: { uid: inviter.uid, displayName: inviter.displayName, photoURL: inviter.photoURL, damageDealt: 0, rankPoints: inviter.rankPoints, clanId: inviter.clanId || null, clanTag: null, selectedBird: inviterBird, currentHealth: inviterBird.maxHealth, activeBadge: inviter.activeBadge || null, equippedEmotes: inviter.equippedEmotes || [], ultimateCooldownLeft: inviterBird.ultimateCooldown || 0, potions: inviter.inventory?.potions || {} },
-        player2: { uid: invitee.uid, displayName: invitee.displayName, photoURL: invitee.photoURL, damageDealt: 0, rankPoints: invitee.rankPoints, clanId: invitee.clanId || null, clanTag: null, selectedBird: inviteeBird, currentHealth: inviteeBird.maxHealth, activeBadge: invitee.activeBadge || null, equippedEmotes: invitee.equippedEmotes || [], ultimateCooldownLeft: inviteeBird.ultimateCooldown || 0, potions: invitee.inventory?.potions || {} },
+        player1: { uid: inviter.uid, displayName: inviter.displayName, photoURL: inviter.photoURL, damageDealt: 0, rankPoints: inviter.rankPoints, clanId: inviter.clanId || null, clanTag: null, selectedBird: inviterBird, currentHealth: inviterBird.maxHealth, activeBadge: inviter.activeBadge || null, equippedEmotes: inviter.equippedEmotes || [], ultimateCooldownLeft: inviterBird.ultimateCooldown || 0, perfectMeter: 0, potions: inviter.inventory?.potions || {} },
+        player2: { uid: invitee.uid, displayName: invitee.displayName, photoURL: invitee.photoURL, damageDealt: 0, rankPoints: invitee.rankPoints, clanId: invitee.clanId || null, clanTag: null, selectedBird: inviteeBird, currentHealth: inviteeBird.maxHealth, activeBadge: invitee.activeBadge || null, equippedEmotes: invitee.equippedEmotes || [], ultimateCooldownLeft: inviteeBird.ultimateCooldown || 0, perfectMeter: 0, potions: invitee.inventory?.potions || {} },
         status: 'invited',
         winner: null,
         createdAt: Date.now(),

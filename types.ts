@@ -300,6 +300,7 @@ export interface MatchPlayer {
     activeEffects?: ActiveEffects;
     healUsesLeft?: number;
     wins?: number;
+    perfectMeter?: number;
 }
 
 export interface TurnTimer {

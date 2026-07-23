@@ -139,7 +139,6 @@ const ReactionAnimation: React.FC<{ payload: { reaction: string; targetPlayerUid
 const CONFIRM_FORFEIT_KEY = 'ff-forfeit-confirm';
 
 const ROUNDS_TO_WIN = 2;
-const MAX_TURNS_PER_ROUND = 10;
 
 const processRoundEnd = (data: any, winnerKey: string, loserKey: string, winnerUid: string) => {
   if (!data.rounds) data.rounds = [];
@@ -169,6 +168,9 @@ const processRoundEnd = (data: any, winnerKey: string, loserKey: string, winnerU
 
   data.player1.activeEffects = {};
   data.player2.activeEffects = {};
+
+  data.player1.perfectMeter = 0;
+  data.player2.perfectMeter = 0;
 
   data.turn = 1;
 
@@ -561,6 +563,22 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
         let damage = currentData[meKey].selectedBird.skillPower;
 
+        // --- Critical Hit (15% chance for 2x damage) ---
+        let isCritical = false;
+        if (Math.random() < 0.15) {
+            damage *= 2;
+            isCritical = true;
+        }
+
+        // --- Perfect Meter: Super Precise Power (3x damage) ---
+        let isSuperPrecise = false;
+        if ((currentData[meKey].perfectMeter || 0) >= 100) {
+            damage *= 3;
+            isSuperPrecise = true;
+            currentData[meKey].perfectMeter = 0;
+            currentData.log.push(`${currentData[meKey].displayName} unleashes SUPER PRECISE POWER!`);
+        }
+
         // --- Block Defense Check ---
         if (currentData[opponentKey].activeEffects?.blocking) {
             damage = Math.floor(damage * 0.3);
@@ -605,7 +623,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         currentData[meKey].damageDealt += damage;
 
         if (!currentData.log) currentData.log = [];
-        currentData.log.push(`${currentData[meKey].displayName} attacks for ${damage} damage!`);
+        const critLabel = isCritical ? ' CRITICAL!' : '';
+        const preciseLabel = isSuperPrecise ? ' ⚡SUPER PRECISE⚡' : '';
+        currentData.log.push(`${currentData[meKey].displayName} attacks for ${damage} damage!${critLabel}${preciseLabel}`);
 
         if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
             currentData[meKey].ultimateCooldownLeft -= 1;
@@ -618,28 +638,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         if (currentData[opponentKey].currentHealth <= 0) {
             return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
         }
-        if (currentData.turn >= MAX_TURNS_PER_ROUND) {
-            const p1Health = currentData.player1.currentHealth;
-            const p2Health = currentData.player2.currentHealth;
-            if (p1Health > p2Health) {
-                return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
-            } else if (p2Health > p1Health) {
-                return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
-            } else {
-                if (!currentData.log) currentData.log = [];
-                currentData.log.push("Round draw! Starting next round...");
-                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
-                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
-                currentData.player1.activeEffects = {};
-                currentData.player2.activeEffects = {};
-                currentData.turn = 1;
-                currentData.currentRound = (currentData.currentRound || 1) + 1;
-                currentData.currentTurnPlayerUid = currentData.player1.uid;
-                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
-                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
-                return currentData;
-            }
+
+        // Build perfect meter on successful hit
+        if (damage > 0) {
+            currentData[meKey].perfectMeter = Math.min(100, (currentData[meKey].perfectMeter || 0) + 25);
         }
+
         currentData.turn += 1;
         const nextUid = currentData[opponentKey].uid;
         currentData.currentTurnPlayerUid = nextUid;
@@ -748,28 +752,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
         if (currentData[opponentKey].currentHealth <= 0) {
             return processRoundEnd(currentData, meKey, opponentKey, currentUserId);
-        }
-        if (currentData.turn >= MAX_TURNS_PER_ROUND) {
-            const p1Health = currentData.player1.currentHealth;
-            const p2Health = currentData.player2.currentHealth;
-            if (p1Health > p2Health) {
-                return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
-            } else if (p2Health > p1Health) {
-                return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
-            } else {
-                if (!currentData.log) currentData.log = [];
-                currentData.log.push("Round draw! Starting next round...");
-                currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
-                currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
-                currentData.player1.activeEffects = {};
-                currentData.player2.activeEffects = {};
-                currentData.turn = 1;
-                currentData.currentRound = (currentData.currentRound || 1) + 1;
-                currentData.currentTurnPlayerUid = currentData.player1.uid;
-                currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
-                currentData.log.push(`--- Round ${currentData.currentRound} ---`);
-                return currentData;
-            }
         }
         currentData.turn += 1;
         currentData.currentTurnPlayerUid = currentData[opponentKey].uid;
@@ -948,6 +930,22 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
 
                 let damage = currentData[opponentKey].selectedBird.skillPower;
 
+                // --- Critical Hit (15% chance for 2x damage) ---
+                let isCritical = false;
+                if (Math.random() < 0.15) {
+                    damage *= 2;
+                    isCritical = true;
+                }
+
+                // --- Perfect Meter: Super Precise Power (3x damage) ---
+                let isSuperPrecise = false;
+                if ((currentData[opponentKey].perfectMeter || 0) >= 100) {
+                    damage *= 3;
+                    isSuperPrecise = true;
+                    currentData[opponentKey].perfectMeter = 0;
+                    currentData.log.push(`${currentData[opponentKey].displayName} unleashes SUPER PRECISE POWER!`);
+                }
+
                 if (!currentData.log) currentData.log = [];
 
                 const botUltimateCooldown = currentData[opponentKey].ultimateCooldownLeft || 0;
@@ -1004,7 +1002,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                     }
 
                     if (damage > 0) {
-                        currentData.log.push(`Bot attacks for ${damage} damage!`);
+                        const critLabel = isCritical ? ' CRITICAL!' : '';
+                        const preciseLabel = isSuperPrecise ? ' ⚡SUPER PRECISE⚡' : '';
+                        currentData.log.push(`Bot attacks for ${damage} damage!${critLabel}${preciseLabel}`);
                     }
                 } else if (damage > 0 && botUltimateType === 'MASSIVE_DAMAGE') {
                      if (currentData[meKey].activeEffects?.invulnerable) {
@@ -1026,28 +1026,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                 if (currentData[meKey].currentHealth <= 0) {
                     return processRoundEnd(currentData, opponentKey, meKey, opponent?.uid || '');
                 }
-                if (currentData.turn >= MAX_TURNS_PER_ROUND) {
-                    const p1Health = currentData.player1.currentHealth;
-                    const p2Health = currentData.player2.currentHealth;
-                    if (p1Health > p2Health) {
-                        return processRoundEnd(currentData, 'player1', 'player2', currentData.player1.uid);
-                    } else if (p2Health > p1Health) {
-                        return processRoundEnd(currentData, 'player2', 'player1', currentData.player2.uid);
-                    } else {
-                        if (!currentData.log) currentData.log = [];
-                        currentData.log.push("Round draw! Starting next round...");
-                        currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
-                        currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
-                        currentData.player1.activeEffects = {};
-                        currentData.player2.activeEffects = {};
-                        currentData.turn = 1;
-                        currentData.currentRound = (currentData.currentRound || 1) + 1;
-                        currentData.currentTurnPlayerUid = currentData.player1.uid;
-                        currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
-                        currentData.log.push(`--- Round ${currentData.currentRound} ---`);
-                        return currentData;
-                    }
+
+                // Build perfect meter on successful hit
+                if (damage > 0) {
+                    currentData[opponentKey].perfectMeter = Math.min(100, (currentData[opponentKey].perfectMeter || 0) + 25);
                 }
+
                 currentData.turn += 1;
                 currentData.currentTurnPlayerUid = currentData[meKey].uid;
                 currentData.turnTimer = {
@@ -1159,7 +1143,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             <h2 className="text-sm sm:text-lg font-bold text-yellow-400 text-center">
               {isGameActive ? (isMyTurn ? "YOUR TURN" : `${opponent.displayName}'s Turn`) : "MATCH OVER"}
             </h2>
-            <p className="text-xs text-gray-400">Turn {gameState.turn}/10</p>
+            <p className="text-xs text-gray-400">Turn {gameState.turn}</p>
 
             {isGameActive && turnTimeLeft !== null && (
               <div className="w-full mt-1">
@@ -1180,6 +1164,34 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             <div ref={el => { if (el) playerRefs.current.set(me.uid, el); }} className="bird-wrapper">
               <EmoteBubble payload={emoteDisplay.me} />
               <LottieBird bird={me.selectedBird} size="lg" animated={true} />
+            </div>
+          </div>
+        </div>
+
+        {/* Perfect Meter Bars */}
+        <div className="w-full px-4 pb-1 flex gap-4 items-center mt-1">
+          <div className="flex-1 flex flex-col items-end gap-0.5">
+            <div className="flex items-center gap-1">
+              <span className="text-[8px] text-yellow-300 font-bold">{opponent?.perfectMeter || 0}%</span>
+              <span className="text-[7px] text-yellow-500/80 uppercase tracking-wider">Perfect</span>
+            </div>
+            <div className="w-full max-w-[120px] h-1.5 bg-gray-800 rounded-full border border-gray-600 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-400 transition-all duration-300"
+                style={{ width: `${Math.min(100, opponent?.perfectMeter || 0)}%` }}
+              />
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col items-start gap-0.5">
+            <div className="flex items-center gap-1">
+              <span className="text-[7px] text-yellow-500/80 uppercase tracking-wider">Perfect</span>
+              <span className="text-[8px] text-yellow-300 font-bold">{me?.perfectMeter || 0}%</span>
+            </div>
+            <div className="w-full max-w-[120px] h-1.5 bg-gray-800 rounded-full border border-gray-600 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-400 transition-all duration-300"
+                style={{ width: `${Math.min(100, me?.perfectMeter || 0)}%` }}
+              />
             </div>
           </div>
         </div>
