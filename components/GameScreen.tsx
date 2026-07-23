@@ -172,6 +172,8 @@ const processRoundEnd = (data: any, winnerKey: string, loserKey: string, winnerU
   data.player1.perfectMeter = 0;
   data.player2.perfectMeter = 0;
 
+  data.roundTimerEndTime = Date.now() + 60000;
+
   data.turn = 1;
 
   data.currentTurnPlayerUid = data[loserKey].uid;
@@ -205,6 +207,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   const [reactionDisplay, setReactionDisplay] = useState<{ reaction: string; targetPlayerUid: string; key: string } | null>(null);
   const [gameOverState, setGameOverState] = useState<'win' | 'loss' | 'draw' | null>(null);
   const [turnTimeLeft, setTurnTimeLeft] = useState<number | null>(null);
+  const [roundTimeLeft, setRoundTimeLeft] = useState<number | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showReconnectBanner, setShowReconnectBanner] = useState(false);
   const lastEmoteKey = useRef<string | null>(null);
@@ -366,6 +369,30 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
       }
     };
   }, [gameState.turnTimer, gameState.status, gameState.currentTurnPlayerUid, currentUserId, match.id]);
+
+  // Round Timer Logic (60s per round)
+  useEffect(() => {
+    if (gameState.status !== 'active' || gameState.currentTurnPlayerUid !== currentUserId) {
+      return;
+    }
+    if (!gameState.roundTimerEndTime) {
+      setRoundTimeLeft(null);
+      return;
+    }
+
+    const updateRoundTimer = () => {
+      const remaining = Math.max(0, gameState.roundTimerEndTime! - Date.now());
+      setRoundTimeLeft(Math.ceil(remaining / 1000));
+
+      if (remaining <= 0) {
+        gameService.resolveRoundByTimer(match.id).catch(() => {});
+      }
+    };
+
+    updateRoundTimer();
+    const interval = setInterval(updateRoundTimer, 500);
+    return () => clearInterval(interval);
+  }, [gameState.roundTimerEndTime, gameState.status, currentUserId, match.id]);
 
   // Calculate potential damage for preview
   const potentialDamage = useMemo(() => {
@@ -1144,6 +1171,21 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
               {isGameActive ? (isMyTurn ? "YOUR TURN" : `${opponent.displayName}'s Turn`) : "MATCH OVER"}
             </h2>
             <p className="text-xs text-gray-400">Turn {gameState.turn}</p>
+
+            {isGameActive && roundTimeLeft !== null && (
+              <div className="w-full mt-1">
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-[10px] font-bold text-red-400">⏱ ROUND</span>
+                  <span className={`text-sm font-bold ${roundTimeLeft <= 10 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>{roundTimeLeft}s</span>
+                </div>
+                <div className="w-full bg-gray-800 h-1 rounded-full border border-gray-600 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${roundTimeLeft <= 10 ? 'bg-red-500 animate-pulse' : 'bg-red-500'}`}
+                    style={{ width: `${(roundTimeLeft / 60) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {isGameActive && turnTimeLeft !== null && (
               <div className="w-full mt-1">

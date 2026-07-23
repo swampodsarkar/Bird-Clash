@@ -7,6 +7,8 @@ import { updateUserMatchStatus } from './friendService';
 import { BIRD_DEFINITIONS, RANK_TIERS } from '../constants';
 import { getRankInfo } from '../utils/helpers';
 
+const ROUND_TIMER_DURATION = 60000; // 1 minute per round
+
 
 const FALLBACK_BOT_NAMES = [
     'Abdullah', 'Abir', 'Adnan', 'Afnan', 'Ahmed', 'Ahnaf', 'Akash', 'Alif', 'Amin', 'Anik', 'Anis', 'Arafat', 'Arham', 'Arif', 'Arifin', 'Arman', 'Asif', 'Atik', 'Ayan', 'Ayon', 'Azmain', 'Bappy', 'Bashar', 'Bilal', 'Dipu', 'Emon', 'Enamul', 'Fahad', 'Fahim', 'Faisal', 'Farhan', 'Faruque', 'Habib', 'Hamid', 'Hasan', 'Hasib', 'Hridoy', 'Ibrahim', 'Imran', 'Iqbal', 'Irfan', 'Ishraq', 'Jahid', 'Jamal', 'Jamil', 'Jisan', 'Joy', 'Kabir', 'Kamal', 'Karim', 'Khalid', 'Mahbub', 'Mahfuz', 'Mahmud', 'Masud', 'Mehedi', 'Minhaj', 'Mizan', 'Mohammad', 'Mohsin', 'Monir', 'Morshed', 'Mushfiqur', 'Nabil', 'Nadim', 'Nafis', 'Nahid', 'Nayeem', 'Nazmul', 'Nibir', 'Parvez', 'Rafan', 'Rafiq', 'Rafsan', 'Rahim', 'Rahman', 'Rahat', 'Rajib', 'Raju', 'Rakib', 'Rashed', 'Riad', 'Rifat', 'Rohan', 'Rubel', 'Sabbir', 'Sadman', 'Saiful', 'Sakib', 'Shakib', 'Salman', 'Sameer', 'Shanto', 'Shihab', 'Shuvo', 'Siam', 'Sumon', 'Tahsin', 'Tamim', 'Tanvir', 'Tariq'
@@ -147,6 +149,7 @@ export const findMatch = async (
                 currentTurnStartTime: Date.now(),
                 turnDuration: 30,
             },
+            roundTimerEndTime: Date.now() + ROUND_TIMER_DURATION,
           };
           await rtdb.ref(`player_matches/${opponentData.uid}`).set(matchId);
       } else {
@@ -186,7 +189,8 @@ export const findMatch = async (
             currentTurnPlayerUid: player.uid,
             turnOrder: [player.uid, p3Data.uid, p2Data.uid, p4Data.uid],
             log: [`Round 1: 2v2 Match begins! Team 1: ${player.displayName}, ${p2Data.displayName} vs Team 2: ${p3Data.displayName}, ${p4Data.displayName}`],
-            isNormalized
+            isNormalized,
+            roundTimerEndTime: Date.now() + ROUND_TIMER_DURATION,
           };
           await rtdb.ref(`player_matches/${p2Data.uid}`).set(matchId);
           await rtdb.ref(`player_matches/${p3Data.uid}`).set(matchId);
@@ -315,6 +319,7 @@ export const createBotMatch = async (player: Player, selectedBird: Bird): Promis
             currentTurnStartTime: Date.now(),
             turnDuration: 30,
         },
+        roundTimerEndTime: Date.now() + ROUND_TIMER_DURATION,
     };
 
     // 7. Save to Firebase and Return
@@ -361,6 +366,7 @@ export const createWarMatch = async (warId: string, battleIndex: number, p1: Mat
             currentTurnStartTime: Date.now(),
             turnDuration: 30,
         },
+        roundTimerEndTime: Date.now() + ROUND_TIMER_DURATION,
     };
     await rtdb.ref(`matches/${matchId}`).set(newMatch);
     return newMatch;
@@ -484,6 +490,7 @@ export const createPrivateMatch = async (inviter: Player, inviteeUid: string): P
             currentTurnStartTime: Date.now(),
             turnDuration: 30,
         },
+        roundTimerEndTime: Date.now() + ROUND_TIMER_DURATION,
     };
 
     await matchRef.set(newMatch);
@@ -505,7 +512,7 @@ export const acceptPrivateMatch = async (matchId: string, accepterUid: string): 
     }
     const match = matchSnapshot.val() as Match;
     
-    await matchRef.update({ status: 'active', startTime: Date.now() });
+    await matchRef.update({ status: 'active', startTime: Date.now(), roundTimerEndTime: Date.now() + ROUND_TIMER_DURATION });
     
     await rtdb.ref(`player_invites/${accepterUid}`).remove();
     
@@ -527,4 +534,70 @@ export const listenForInvites = (uid: string, callback: (invite: Invite | null) 
     };
     inviteRef.on('value', listener);
     return () => inviteRef.off('value', listener);
+};
+
+export const resolveRoundByTimer = async (matchId: string) => {
+    const matchRef = rtdb.ref(`matches/${matchId}`);
+    await matchRef.transaction(currentData => {
+        if (!currentData || currentData.status !== 'active') return;
+        if (!currentData.roundTimerEndTime || Date.now() < currentData.roundTimerEndTime) return;
+        const p1Health = currentData.player1.currentHealth;
+        const p2Health = currentData.player2.currentHealth;
+        if (p1Health > p2Health) {
+            return processRoundEndTransaction(currentData, 'player1', 'player2', currentData.player1.uid);
+        } else if (p2Health > p1Health) {
+            return processRoundEndTransaction(currentData, 'player2', 'player1', currentData.player2.uid);
+        } else {
+            if (!currentData.log) currentData.log = [];
+            currentData.log.push("Round draw! Starting next round...");
+            currentData.player1.currentHealth = currentData.player1.selectedBird.maxHealth;
+            currentData.player2.currentHealth = currentData.player2.selectedBird.maxHealth;
+            currentData.player1.activeEffects = {};
+            currentData.player2.activeEffects = {};
+            currentData.player1.perfectMeter = 0;
+            currentData.player2.perfectMeter = 0;
+            currentData.turn = 1;
+            currentData.currentRound = (currentData.currentRound || 1) + 1;
+            currentData.currentTurnPlayerUid = currentData.player1.uid;
+            currentData.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+            currentData.roundTimerEndTime = Date.now() + ROUND_TIMER_DURATION;
+            currentData.log.push(`--- Round ${currentData.currentRound} ---`);
+            return currentData;
+        }
+    });
+};
+
+// Reusable round-end logic (mirrors GameScreen's processRoundEnd)
+const processRoundEndTransaction = (data: any, winnerKey: string, loserKey: string, winnerUid: string) => {
+    if (!data.rounds) data.rounds = [];
+    data.rounds.push({
+        roundNumber: data.currentRound || 1,
+        winner: winnerUid,
+        player1Health: Math.max(0, data.player1.currentHealth),
+        player2Health: Math.max(0, data.player2.currentHealth),
+    });
+    data[winnerKey].wins = (data[winnerKey].wins || 0) + 1;
+    if (!data.log) data.log = [];
+    data.log.push(`${data[winnerKey].displayName} wins Round ${data.currentRound}!`);
+    const ROUNDS_TO_WIN = 2;
+    if (data[winnerKey].wins >= ROUNDS_TO_WIN) {
+        data.winner = winnerUid;
+        data.status = 'finished';
+        data.log.push(`${data[winnerKey].displayName} wins the match ${data[winnerKey].wins}-${data[loserKey].wins || 0}!`);
+        return data;
+    }
+    data.currentRound = (data.currentRound || 1) + 1;
+    data.player1.currentHealth = data.player1.selectedBird.maxHealth;
+    data.player2.currentHealth = data.player2.selectedBird.maxHealth;
+    data.player1.activeEffects = {};
+    data.player2.activeEffects = {};
+    data.player1.perfectMeter = 0;
+    data.player2.perfectMeter = 0;
+    data.turn = 1;
+    data.currentTurnPlayerUid = data[loserKey].uid;
+    data.turnTimer = { currentTurnStartTime: Date.now(), turnDuration: 30 };
+    data.roundTimerEndTime = Date.now() + ROUND_TIMER_DURATION;
+    data.log.push(`--- Round ${data.currentRound} ---`);
+    data.log.push(`${data[loserKey].displayName} starts Round ${data.currentRound}.`);
+    return data;
 };

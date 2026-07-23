@@ -353,6 +353,7 @@ export interface Match {
     };
     isNormalized?: boolean;
     turnTimer?: TurnTimer;
+    roundTimerEndTime?: number;
 }
 
 export interface MatchResult {
