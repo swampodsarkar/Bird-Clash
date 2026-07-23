@@ -8,7 +8,7 @@ import PlayerAvatar from './common/PlayerAvatar';
 import { getRankInfo } from '../utils/helpers';
 import { FALLBACK_BOT_NAMES } from '../constants';
 import { toast } from 'react-toastify';
-import { Trophy, Medal } from 'lucide-react';
+import { Trophy, Medal, Users } from 'lucide-react';
 
 type LeaderboardTab = 'players' | 'clans';
 type PlayerFilter = 'all-time' | 'weekly' | 'daily';
@@ -17,39 +17,101 @@ interface LeaderboardProps {
   onViewProfile: (uid: string) => void;
 }
 
-const generateBotPlayers = (): Player[] => {
+const CLAN_NAMES = [
+  'Phoenix Rising', 'Shadow Wolves', 'Dragon Fury', 'Thunder Hawks', 'Night Stalkers',
+  'Golden Eagles', 'Iron Panthers', 'Storm Riders', 'Blazing Falcons', 'Crimson Vipers',
+  'Silver Lions', 'Dark Ravens', 'Fire Hawks', 'Arctic Foxes', 'Venom Scorpions',
+  'Savage Bears', 'Royal Tigers', 'Phantom Knights', 'Steel Titans', 'Mystic Dragons',
+  'Omega Force', 'Elite Snipers', 'War Machine', 'Death Dealers', 'Soul Reapers',
+  'Ghost Squad', 'Dark Angels', 'Fury Wings', 'Ice Breakers', 'Thunder Wolves',
+  'Blade Runners', 'Shadow Hawks', 'Fire Storm', 'Iron Fist', 'Storm Breakers',
+];
+
+const CLAN_TAGS = [
+  'PR', 'SW', 'DF', 'TH', 'NS', 'GE', 'IP', 'SR', 'BF', 'CV',
+  'SL', 'DR', 'FH', 'AF', 'VS', 'SB', 'RT', 'PK', 'ST', 'MD',
+  'OF', 'ES', 'WM', 'DD', 'SOR', 'GS', 'DA', 'FW', 'IB', 'TW',
+  'BR', 'SH', 'FS', 'IF', 'SB',
+];
+
+const generateBotClans = (): Clan[] => {
+  const clans: Clan[] = [];
+  const shuffled = CLAN_NAMES.map((name, i) => ({ name, tag: CLAN_TAGS[i] })).sort(() => 0.5 - Math.random());
+
+  for (let i = 0; i < shuffled.length; i++) {
+    const memberCount = Math.floor(Math.random() * 20) + 5;
+    const totalRankPoints = 5000 + Math.floor(Math.random() * 45000);
+    const members: { [uid: string]: any } = {};
+    for (let j = 0; j < memberCount; j++) {
+      const muid = `botclan_${i}_member_${j}`;
+      members[muid] = {
+        uid: muid,
+        displayName: `Member_${i}_${j}`,
+        photoURL: null,
+        rankPoints: Math.floor(Math.random() * 3000) + 500,
+      };
+    }
+    clans.push({
+      id: `bot_clan_${i}`,
+      name: shuffled[i].name,
+      tag: shuffled[i].tag,
+      leaderId: `botclan_${i}_member_0`,
+      members,
+      memberCount,
+      totalRankPoints,
+      description: 'A competitive clan.',
+      createdAt: Date.now() - Math.floor(Math.random() * 86400000 * 90),
+    });
+  }
+  return clans;
+};
+
+const generateBotPlayers = (filter: PlayerFilter): Player[] => {
   const bots: Player[] = [];
   const shuffledNames = [...FALLBACK_BOT_NAMES].sort(() => 0.5 - Math.random());
+  const now = Date.now();
   
   for (let i = 0; i < 100; i++) {
     let rankPoints = 0;
     if (i < 3) {
-      rankPoints = 4000 + Math.floor(Math.random() * 500); // Grandmaster
+      rankPoints = 4000 + Math.floor(Math.random() * 500);
     } else if (i < 10) {
-      rankPoints = 3600 + Math.floor(Math.random() * 400); // Master
+      rankPoints = 3600 + Math.floor(Math.random() * 400);
     } else if (i < 25) {
-      rankPoints = 3200 + Math.floor(Math.random() * 400); // Heroic
+      rankPoints = 3200 + Math.floor(Math.random() * 400);
     } else if (i < 50) {
-      rankPoints = 2500 + Math.floor(Math.random() * 700); // Diamond
+      rankPoints = 2500 + Math.floor(Math.random() * 700);
     } else {
-      rankPoints = 1200 + Math.floor(Math.random() * 1300); // Silver/Gold
+      rankPoints = 1200 + Math.floor(Math.random() * 1300);
+    }
+
+    let dailyRP = 0;
+    let weeklyRP = 0;
+    if (filter === 'daily') {
+      dailyRP = Math.floor(Math.random() * 300) + 20;
+      weeklyRP = Math.floor(Math.random() * 800) + 50;
+    } else if (filter === 'weekly') {
+      weeklyRP = Math.floor(Math.random() * 800) + 50;
+      dailyRP = Math.floor(Math.random() * 100);
     }
 
     const botName = shuffledNames[i % shuffledNames.length];
-    const botUid = `bot_${i}_${botName}_${rankPoints}`;
+    const botUid = `bot_${i}_${botName}_${filter}`;
 
     bots.push({
       uid: botUid,
       displayName: botName,
       photoURL: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${botUid}`,
       rankPoints,
+      dailyRankPoints: dailyRP,
+      weeklyRankPoints: weeklyRP,
       coins: Math.floor(Math.random() * 10000),
       gems: Math.floor(Math.random() * 500),
       level: Math.floor(Math.random() * 50) + 10,
       xp: 0,
       xpToNextLevel: 100,
       clanId: null,
-      lastLogin: Date.now() - Math.floor(Math.random() * 1000 * 60 * 60 * 24 * 7),
+      lastLogin: now - Math.floor(Math.random() * 1000 * 60 * 60 * 24 * 7),
       email: null,
       mineCapacity: 0,
       mineLastCollected: 0,
@@ -90,13 +152,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onViewProfile }) => {
         }
         
         if (playerFilter === 'all-time') {
-            const botPlayers = generateBotPlayers();
+            const botPlayers = generateBotPlayers('all-time');
             const allPlayers = [...realPlayers, ...botPlayers];
             allPlayers.sort((a, b) => (b.rankPoints || 0) - (a.rankPoints || 0));
             setTopPlayers(allPlayers.slice(0, 100));
         } else {
-            realPlayers.sort((a, b) => (b[orderBy as keyof Player] as number || 0) - (a[orderBy as keyof Player] as number || 0));
-            setTopPlayers(realPlayers);
+            const botPlayers = generateBotPlayers(playerFilter);
+            const allPlayers = [...realPlayers, ...botPlayers];
+            allPlayers.sort((a, b) => (b[orderBy as keyof Player] as number || 0) - (a[orderBy as keyof Player] as number || 0));
+            setTopPlayers(allPlayers.slice(0, 100));
         }
         setLoading(false);
       };
@@ -109,7 +173,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onViewProfile }) => {
                 clans.push(child.val());
             });
         }
-        setTopClans(clans.reverse());
+        const botClans = generateBotClans();
+        const allClans = [...clans, ...botClans];
+        allClans.sort((a, b) => (b.totalRankPoints || 0) - (a.totalRankPoints || 0));
+        setTopClans(allClans.slice(0, 50));
         setLoading(false);
       };
     }
@@ -194,15 +261,24 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onViewProfile }) => {
   const renderClanList = () => (
       <ul className="space-y-1">
       {topClans.map((clan, index) => (
-        <li key={clan.id} className="flex items-center justify-between p-2 bg-gray-900 border border-gray-700 text-xs">
-          <div className="flex items-center space-x-2">
-            <span className={`font-bold text-xs w-6 text-center ${index < 3 ? 'text-yellow-400 text-sm' : 'text-gray-400'}`}>{index + 1}</span>
-            <div>
-                 <p className="font-bold">{clan.name} <span className="text-gray-400">[{clan.tag}]</span></p>
-                 <p className="text-[10px] text-gray-500">{clan.memberCount} members</p>
+        <li key={clan.id} className={`flex items-center justify-between p-2 text-xs transition-all duration-200 cursor-default border animate-slide-up
+            ${index < 3
+                ? 'bg-gradient-to-r from-yellow-900/30 via-yellow-800/20 to-transparent border-yellow-600/30'
+                : 'bg-gray-900/80 border-gray-700/50'
+            }`}
+        >
+          <div className="flex items-center space-x-2 min-w-0 flex-1">
+            <div className={`flex items-center justify-center w-7 h-7 rounded-full font-bold text-xs flex-shrink-0 ${index < 3 ? 'text-white' : 'text-gray-400'}`}
+                style={index < 3 ? { background: `linear-gradient(135deg, ${['#FFD700', '#C0C0C0', '#CD7F32'][index]}, ${['#FFA500', '#A0A0A0', '#8B4513'][index]})` } : {}}
+            >
+                {index + 1}
+            </div>
+            <div className="min-w-0">
+                 <p className="font-bold truncate text-white">{clan.name} <span className="text-gray-400 text-[10px]">[{clan.tag}]</span></p>
+                 <p className="text-[10px] text-gray-500 flex items-center gap-1"><Users size={10} /> {clan.memberCount} members</p>
             </div>
           </div>
-          <span className="font-semibold text-blue-400 flex items-center gap-1"><Trophy size={12} /> {clan.totalRankPoints} RP</span>
+          <span className="font-semibold text-blue-400 flex items-center gap-1 flex-shrink-0 ml-2"><Trophy size={12} /> {clan.totalRankPoints.toLocaleString()} RP</span>
         </li>
       ))}
     </ul>
