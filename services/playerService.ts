@@ -5,6 +5,7 @@ import firebase from 'firebase/compat/app'; // Needed for ServerValue
 import type { Player, Match, MatchResult, MatchHistoryEntry, RoyalePassReward, Bird, Report, MailItem, StoreItem, MatchPlayer, GiftPayload } from '../types';
 import { CURRENT_ROYALE_PASS_SEASON, BIRD_DEFINITIONS, INSECT_DEFINITIONS } from '../constants';
 import { checkAndResetQuests, updateQuestProgress } from './questService';
+import { updateEventProgress } from './eventService';
 import { toast } from 'react-toastify';
 
 const TITLES = [
@@ -308,6 +309,9 @@ export const recordMatchHistory = async (uid: string, match: Match, result: Matc
   if (result.outcome === 'win' || result.outcome === 'loss') {
       await updateQuestProgress(uid, result.matchType, result.myDamageDealt);
   }
+
+  // Track event progress for limited events
+  await updateEventProgress(uid, result.outcome, result.myDamageDealt);
 };
 
 export const checkAndAwardTitles = async (uid: string) => {
@@ -561,7 +565,8 @@ export const addPlayerXpAndLevelUp = async (uid: string, xpToAdd: number): Promi
                 player.xp -= player.xpToNextLevel;
                 player.level += 1;
                 gainedLevels.push(player.level);
-                player.xpToNextLevel = Math.floor(player.xpToNextLevel * 1.1);
+                const multiplier = player.level < 10 ? 1.05 : player.level < 25 ? 1.12 : 1.18;
+                player.xpToNextLevel = Math.floor(player.xpToNextLevel * multiplier);
             }
             if (gainedLevels.length > 0) {
                 const topLevel = gainedLevels[gainedLevels.length - 1];

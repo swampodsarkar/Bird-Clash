@@ -154,6 +154,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const { notifications } = useRealtime();
     const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
     const [topUpEvents, setTopUpEvents] = useState<any[]>([]);
+    const [tournaments, setTournaments] = useState<any[]>([]);
     const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
     const [isClaiming, setIsClaiming] = useState(false);
     const [membershipModalInfo, setMembershipModalInfo] = useState<{type: 'weekly' | 'monthly'} | null>(null);
@@ -174,6 +175,21 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             setTopUpEvents(data);
         });
         return () => eventsRef.off('value', listener);
+    }, []);
+
+    useEffect(() => {
+        const tournRef = rtdb.ref('tournaments').orderByChild('startTime').limitToLast(10);
+        const listener = tournRef.on('value', snapshot => {
+            const data: any[] = [];
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    data.push({ id: child.key!, ...child.val() });
+                });
+            }
+            data.sort((a, b) => b.startTime - a.startTime);
+            setTournaments(data.filter(t => t.status === 'upcoming' || t.status === 'active').slice(0, 5));
+        });
+        return () => tournRef.off('value', listener);
     }, []);
 
     useEffect(() => {
@@ -323,7 +339,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
 
     const isSocialLocked = playerLevel < 3;
     const isEventsLocked = playerLevel < 5;
-    const isEsportsLocked = playerLevel < 10;
+    const isEsportsLocked = playerLevel < 3;
 
     const renderPanelContent = () => {
         const panelProps = { player: playerData };
@@ -446,7 +462,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                     
                     <SidebarButton icon={<Users size={20} />} label="Social" onClick={() => setActiveTab('SOCIAL')} isLocked={isSocialLocked} unlockLevel={3} />
                     <SidebarButton icon={<Calendar size={20} />} label="Events" onClick={() => setIsEventsModalOpen(true)} indicator={true} isLocked={isEventsLocked} unlockLevel={5} />
-                    <SidebarButton icon={<Medal size={20} />} label="Esports" onClick={() => setActiveTab('ESPORTS')} isLocked={isEsportsLocked} unlockLevel={10} />
+                    <SidebarButton icon={<Medal size={20} />} label="Esports" onClick={() => setActiveTab('ESPORTS')} isLocked={isEsportsLocked} unlockLevel={3} />
                     <SidebarButton icon={<span style={{fontSize:20}}>🎁</span>} label="Refer" onClick={() => setIsReferralModalOpen(true)} />
                 </div>
 
@@ -521,6 +537,33 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Live Tournaments Banner */}
+                    {tournaments.length > 0 && (
+                        <div className="flex-shrink-0 max-w-sm mx-auto w-full px-2 pb-1">
+                            <div className="bg-gradient-to-r from-red-900/60 to-orange-900/60 border border-orange-500/30 rounded-lg px-3 py-2">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-bold text-orange-300">🏆 Live Tournaments</span>
+                                    <button onClick={() => setActiveTab('ESPORTS')} className="text-[9px] text-orange-400 hover:text-orange-200 underline">View All</button>
+                                </div>
+                                <div className="space-y-1">
+                                    {tournaments.slice(0, 2).map(t => (
+                                        <div key={t.id} className="flex items-center justify-between text-[10px]">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-yellow-400">🏆</span>
+                                                <span className="text-white font-semibold">{t.name}</span>
+                                                <span className="text-gray-400">({t.playerCount || 0}/{t.maxPlayers})</span>
+                                            </div>
+                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                                t.status === 'upcoming' ? 'bg-blue-600 text-white' :
+                                                t.status === 'active' ? 'bg-green-600 text-white animate-pulse' : 'bg-gray-600 text-gray-300'
+                                            }`}>{t.status.toUpperCase()}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
 

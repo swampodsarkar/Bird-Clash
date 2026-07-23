@@ -6,8 +6,9 @@ import StoreManagement from './components/StoreManagement';
 import RoyalePassManagement from './components/RoyalePassManagement';
 import LivePlayerCount from './components/LivePlayerCount';
 import TopUpEventManagement from './components/TopUpEventManagement';
+import EventManagement from './components/EventManagement';
 
-type Tab = 'Game Settings' | 'Players' | 'Store' | 'Royale Pass' | 'Live Players' | 'Top-Up Events';
+type Tab = 'Game Settings' | 'Players' | 'Store' | 'Royale Pass' | 'Live Players' | 'Top-Up Events' | 'Event Management';
 
 interface DashboardProps {
     onLogout: () => void;
@@ -24,6 +25,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             case 'Royale Pass': return <RoyalePassManagement />;
             case 'Live Players': return <LivePlayerCount />;
             case 'Top-Up Events': return <TopUpEventManagement />;
+            case 'Event Management': return <EventManagement />;
             default: return null;
         }
     };
@@ -60,6 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                     <NavItem label="Royale Pass" />
                     <NavItem label="Live Players" />
                     <NavItem label="Top-Up Events" />
+                    <NavItem label="Event Management" />
                 </nav>
                 <div>
                     {renderContent()}
