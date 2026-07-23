@@ -123,26 +123,39 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
 
                 if (isRanked) {
                     const { tier } = getRankInfo(playerData.rankPoints);
+                    const totalMatches = playerData.totalMatches || 0;
+
                     if (result.outcome === 'win') {
                         coinChange = config.RANK_WINNER_REWARD_COINS;
-                        trophyChange = tier.winPoints;
-                    } else if (result.outcome === 'loss') {
-                        // --- Retention Logic: Close Call Bonus ---
-                        const opponentRemainingHealth = opponent.currentHealth;
-                        const opponentMaxHealth = opponent.selectedBird.maxHealth;
-                        if (opponentRemainingHealth > 0 && (opponentRemainingHealth / opponentMaxHealth) <= 0.15) {
-                            // If opponent had <= 15% HP left, give a consolation prize (50% of win reward)
-                            closeCallAmount = Math.floor(config.RANK_WINNER_REWARD_COINS * 0.5);
-                            coinChange += closeCallAmount;
-                            setCloseCallBonus(closeCallAmount);
-                        }
-
-                        // --- Streak Protection Logic ---
-                        if ((playerData.consecutiveLosses || 0) >= 2) {
+                        // Rank Protection: first 3 matches no RP gain
+                        if (totalMatches < 3) {
                             trophyChange = 0;
                             setStreakProtected(true);
                         } else {
-                            trophyChange = -tier.lossPoints;
+                            trophyChange = tier.winPoints;
+                        }
+                    } else if (result.outcome === 'loss') {
+                        // Rank Protection: first 3 matches no RP loss
+                        if (totalMatches < 3) {
+                            trophyChange = 0;
+                            setStreakProtected(true);
+                        } else {
+                            // --- Retention Logic: Close Call Bonus ---
+                            const opponentRemainingHealth = opponent.currentHealth;
+                            const opponentMaxHealth = opponent.selectedBird.maxHealth;
+                            if (opponentRemainingHealth > 0 && (opponentRemainingHealth / opponentMaxHealth) <= 0.15) {
+                                closeCallAmount = Math.floor(config.RANK_WINNER_REWARD_COINS * 0.5);
+                                coinChange += closeCallAmount;
+                                setCloseCallBonus(closeCallAmount);
+                            }
+
+                            // --- Streak Protection Logic ---
+                            if ((playerData.consecutiveLosses || 0) >= 2) {
+                                trophyChange = 0;
+                                setStreakProtected(true);
+                            } else {
+                                trophyChange = -tier.lossPoints;
+                            }
                         }
                     }
                 } else { // Classic
@@ -211,10 +224,14 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
     
     if (isRanked) {
         const { tier } = getRankInfo(playerData.rankPoints);
+        const totalMatches = playerData.totalMatches || 0;
+        const isRankProtected = totalMatches < 3;
         let trophyChange = 0;
-        if (result.outcome === 'win') trophyChange = tier.winPoints;
-        else if (result.outcome === 'loss') {
-             if (streakProtected) trophyChange = 0;
+        if (result.outcome === 'win') {
+            if (isRankProtected) trophyChange = 0;
+            else trophyChange = tier.winPoints;
+        } else if (result.outcome === 'loss') {
+             if (isRankProtected || streakProtected) trophyChange = 0;
              else trophyChange = -tier.lossPoints;
         }
 
@@ -324,7 +341,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ data, currentUserId, onPl
         <div className="mb-6 space-y-2 bg-black/20 p-3 border-2 border-black relative">
             {streakProtected && (
                 <div className="absolute -top-3 right-[-10px] bg-yellow-500 text-black text-xs font-bold px-2 py-1 rotate-12 border-2 border-white shadow-lg animate-pulse">
-                    MERCY SHIELD ACTIVE!
+                    {(playerData.totalMatches || 0) < 3 ? 'RANK PROTECTED!' : 'MERCY SHIELD!'}
                 </div>
             )}
             {closeCallBonus > 0 && (

@@ -153,12 +153,28 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
 
     const { notifications } = useRealtime();
     const [viewingProfileUid, setViewingProfileUid] = useState<string | null>(null);
+    const [topUpEvents, setTopUpEvents] = useState<any[]>([]);
     const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
     const [isClaiming, setIsClaiming] = useState(false);
     const [membershipModalInfo, setMembershipModalInfo] = useState<{type: 'weekly' | 'monthly'} | null>(null);
     const [isWinterverseModalOpen, setIsWinterverseModalOpen] = useState(false);
     const [isEventsModalOpen, setIsEventsModalOpen] = useState(false);
     const musicStarted = useRef(false);
+
+    useEffect(() => {
+        const eventsRef = rtdb.ref('topUpEvents');
+        const listener = eventsRef.on('value', snapshot => {
+            const data: any[] = [];
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    data.push({ id: child.key!, ...child.val() });
+                });
+            }
+            data.sort((a, b) => b.createdAt - a.createdAt);
+            setTopUpEvents(data);
+        });
+        return () => eventsRef.off('value', listener);
+    }, []);
 
     useEffect(() => {
         const hideModal = sessionStorage.getItem('hideWinterverseModal') === 'true';
@@ -388,6 +404,36 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                     </div>
                 </div>
             </header>
+
+            {/* Top-Up Events Banner */}
+            {topUpEvents.filter(e => e.expiresAt > Date.now()).length > 0 && (
+                <div className="flex-shrink-0 bg-gradient-to-r from-purple-900/80 via-yellow-900/60 to-purple-900/80 backdrop-blur-md border-b border-yellow-500/30 px-3 py-1 flex items-center justify-end gap-3 overflow-x-auto z-10">
+                    {topUpEvents
+                        .filter(e => e.expiresAt > Date.now())
+                        .slice(0, 2)
+                        .map(event => {
+                            const diff = event.expiresAt - Date.now();
+                            const days = Math.floor(diff / 86400000);
+                            const hours = Math.floor((diff % 86400000) / 3600000);
+                            const mins = Math.floor((diff % 3600000) / 60000);
+                            return (
+                                <div key={event.id} className="flex items-center gap-2 bg-black/40 px-2 py-0.5 rounded-lg border border-yellow-500/40 whitespace-nowrap">
+                                    <span className="text-lg">{event.rewardIcon}</span>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[10px] font-bold text-yellow-300">🔥 TOP-UP</span>
+                                            <span className="text-[10px] text-purple-300 font-bold">{event.diamondAmount}💎</span>
+                                        </div>
+                                        <span className="text-[9px] text-gray-300 font-mono">
+                                            {days > 0 ? `${days}d ` : ''}{hours}h {mins}m
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    }
+                </div>
+            )}
 
             {/* Main View - Tighter layout */}
             <main className="flex-grow flex flex-row overflow-hidden">
