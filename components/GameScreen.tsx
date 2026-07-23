@@ -208,6 +208,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
   const [gameOverState, setGameOverState] = useState<'win' | 'loss' | 'draw' | null>(null);
   const [turnTimeLeft, setTurnTimeLeft] = useState<number | null>(null);
   const [roundTimeLeft, setRoundTimeLeft] = useState<number | null>(null);
+  const [roundMultiplier, setRoundMultiplier] = useState<number>(1);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showReconnectBanner, setShowReconnectBanner] = useState(false);
   const lastEmoteKey = useRef<string | null>(null);
@@ -377,12 +378,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
     }
     if (!gameState.roundTimerEndTime) {
       setRoundTimeLeft(null);
+      setRoundMultiplier(1);
       return;
     }
 
     const updateRoundTimer = () => {
       const remaining = Math.max(0, gameState.roundTimerEndTime! - Date.now());
+      const elapsed = 60000 - remaining;
       setRoundTimeLeft(Math.ceil(remaining / 1000));
+
+      // Compute multiplier phase
+      let mult = 1;
+      if (elapsed >= 55000) mult = 3;
+      else if (elapsed >= 40000) mult = 2;
+      setRoundMultiplier(mult);
 
       if (remaining <= 0) {
         gameService.resolveRoundByTimer(match.id).catch(() => {});
@@ -606,6 +615,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
             currentData.log.push(`${currentData[meKey].displayName} unleashes SUPER PRECISE POWER!`);
         }
 
+        // --- Time-based Sudden Death Multiplier (40s=2x, 55s=3x) ---
+        let timeMultiplier = 1;
+        if (currentData.roundTimerEndTime) {
+            const elapsed = Date.now() - (currentData.roundTimerEndTime - 60000);
+            if (elapsed >= 55000) timeMultiplier = 3;
+            else if (elapsed >= 40000) timeMultiplier = 2;
+        }
+        if (timeMultiplier > 1) {
+            damage *= timeMultiplier;
+        }
+
         // --- Block Defense Check ---
         if (currentData[opponentKey].activeEffects?.blocking) {
             damage = Math.floor(damage * 0.3);
@@ -652,7 +672,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         if (!currentData.log) currentData.log = [];
         const critLabel = isCritical ? ' CRITICAL!' : '';
         const preciseLabel = isSuperPrecise ? ' ⚡SUPER PRECISE⚡' : '';
-        currentData.log.push(`${currentData[meKey].displayName} attacks for ${damage} damage!${critLabel}${preciseLabel}`);
+        const timeLabel = timeMultiplier > 1 ? ` ⏱${timeMultiplier}x TIME!` : '';
+        currentData.log.push(`${currentData[meKey].displayName} attacks for ${damage} damage!${critLabel}${preciseLabel}${timeLabel}`);
 
         if (currentData[meKey].ultimateCooldownLeft && currentData[meKey].ultimateCooldownLeft > 0) {
             currentData[meKey].ultimateCooldownLeft -= 1;
@@ -745,11 +766,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
         const ultimateType = currentData[meKey].selectedBird.ultimateType;
         const ultimateValue = currentData[meKey].selectedBird.ultimateValue || 0;
 
+        // --- Time-based Sudden Death Multiplier (40s=2x, 55s=3x) ---
+        let timeMultiplier = 1;
+        if (currentData.roundTimerEndTime) {
+            const elapsed = Date.now() - (currentData.roundTimerEndTime - 60000);
+            if (elapsed >= 55000) timeMultiplier = 3;
+            else if (elapsed >= 40000) timeMultiplier = 2;
+        }
+
         if (!currentData.log) currentData.log = [];
-        currentData.log.push(`${currentData[meKey].displayName} uses ULTIMATE: ${currentData[meKey].selectedBird.ultimateDescription}`);
+        const timeLabel = timeMultiplier > 1 ? ` ⚡${timeMultiplier}x TIME BONUS` : '';
+        currentData.log.push(`${currentData[meKey].displayName} uses ULTIMATE: ${currentData[meKey].selectedBird.ultimateDescription}${timeLabel}`);
 
         if (ultimateType === 'MASSIVE_DAMAGE') {
-            let damage = ultimateValue;
+            let damage = ultimateValue * timeMultiplier;
             if (currentData[opponentKey].activeEffects?.blocking) {
                 damage = Math.floor(damage * 0.3);
                 delete currentData[opponentKey].activeEffects.blocking;
@@ -973,6 +1003,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                     currentData.log.push(`${currentData[opponentKey].displayName} unleashes SUPER PRECISE POWER!`);
                 }
 
+                // --- Time-based Damage Multiplier ---
+                let timeMultiplier = 1;
+                if (currentData.roundTimerEndTime) {
+                    const elapsed = Date.now() - (currentData.roundTimerEndTime - 60000);
+                    if (elapsed >= 45000) timeMultiplier = 3;      // last 15s: 3x
+                    else if (elapsed >= 30000) timeMultiplier = 2; // 30-45s: 2x
+                }
+                damage *= timeMultiplier;
+
                 if (!currentData.log) currentData.log = [];
 
                 const botUltimateCooldown = currentData[opponentKey].ultimateCooldownLeft || 0;
@@ -981,10 +1020,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                 let usedUltimate = false;
                 if (botUltimateType && botUltimateCooldown <= 0) {
                     usedUltimate = true;
-                    currentData.log.push(`Bot uses ULTIMATE: ${currentData[opponentKey].selectedBird.ultimateDescription}`);
+                    const timeLabel = timeMultiplier > 1 ? ` ⚡${timeMultiplier}x TIME BONUS` : '';
+                    currentData.log.push(`Bot uses ULTIMATE: ${currentData[opponentKey].selectedBird.ultimateDescription}${timeLabel}`);
 
                     if (botUltimateType === 'MASSIVE_DAMAGE') {
-                        damage = currentData[opponentKey].selectedBird.ultimateValue || 0;
+                        damage = (currentData[opponentKey].selectedBird.ultimateValue || 0) * timeMultiplier;
                         spawnParticles('ultimate', 8);
                         setActiveEffect('ultimate');
                     } else if (botUltimateType === 'FULL_HEAL') {
@@ -1031,7 +1071,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                     if (damage > 0) {
                         const critLabel = isCritical ? ' CRITICAL!' : '';
                         const preciseLabel = isSuperPrecise ? ' ⚡SUPER PRECISE⚡' : '';
-                        currentData.log.push(`Bot attacks for ${damage} damage!${critLabel}${preciseLabel}`);
+                        const timeLabel = timeMultiplier > 1 ? ` ⏱${timeMultiplier}x TIME!` : '';
+                        currentData.log.push(`Bot attacks for ${damage} damage!${critLabel}${preciseLabel}${timeLabel}`);
                     }
                 } else if (damage > 0 && botUltimateType === 'MASSIVE_DAMAGE') {
                      if (currentData[meKey].activeEffects?.invulnerable) {
@@ -1184,6 +1225,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ match, currentPlayer, onGameOve
                     style={{ width: `${(roundTimeLeft / 60) * 100}%` }}
                   />
                 </div>
+                {roundMultiplier > 1 && (
+                  <div className="mt-1 flex items-center justify-center gap-1">
+                    <span className={`text-[10px] font-bold ${roundMultiplier === 3 ? 'text-red-400 animate-pulse' : 'text-orange-400'}`}>
+                      ⚡ DAMAGE {roundMultiplier}x
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
