@@ -303,7 +303,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     
     // Feature Locking Logic for NPE
     const playerLevel = playerData.level || 1;
-  const isNewPlayer = (playerData.totalMatches || 0) < 10;
   const hasStarterPack = playerData.hasPurchasedStarterPack || false;
 
     const isSocialLocked = playerLevel < 3;
@@ -473,21 +472,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
 
                             {/* Quick Actions Row */}
                             <div className="flex gap-2 items-center justify-center pt-1 flex-wrap">
-                              {isNewPlayer && (
-                                <div className="relative group">
-                                  <div className="flex items-center gap-1.5 text-[10px] font-bold bg-gradient-to-r from-green-900/60 to-emerald-900/60 px-3 py-1.5 rounded-full border border-green-500/40 text-green-300 shadow-[0_0_10px_rgba(74,222,128,0.15)]">
-                                    <span className="relative flex h-2 w-2">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                    </span>
-                                    🤖 Bot Protected
-                                    <span className="bg-green-600 text-white px-1.5 py-0.5 rounded-full text-[8px]">{10 - (playerData.totalMatches || 0)}</span>
-                                  </div>
-                                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/90 text-[10px] text-white px-2 py-1 rounded border border-green-500/30 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                                    First 10 matches are against bots
-                                  </div>
-                                </div>
-                              )}
                             </div>
                         </div>
                     </div>

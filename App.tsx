@@ -7,7 +7,7 @@ import ResultsScreen from './components/ResultsScreen';
 import InviteNotificationModal from './components/common/InviteNotificationModal';
 import { Spinner } from './components/common/Spinner';
 import type { Match, Player, MatchResult, Invite, MatchPlayer, Bird, CustomRoom, RoomInvite } from './types';
-import { findMatch, cancelMatchmaking, createBotMatch, shouldUseBotProtection } from './services/gameService';
+import { findMatch, cancelMatchmaking, createBotMatch } from './services/gameService';
 import * as roomService from './services/roomService';
 import { listenToPlayer, updatePlayerCoins, completeTutorial } from './services/playerService';
 import { updateUserMatchStatus } from './services/friendService';
@@ -255,25 +255,6 @@ const Game: React.FC = () => {
         cleanup();
         setFoundMatchForVS(locatedMatch);
       };
-
-      // Beginner Bot Protection: first 10 matches = immediate bot
-      const useBotProtection = shouldUseBotProtection(playerData);
-
-      if (useBotProtection) {
-        // Skip queue, go straight to bot
-        try {
-          createBotMatch(playerData, equippedBird).then(botMatch => {
-            handleOpponentLocated(botMatch);
-          }).catch(e => {
-            toast.error("Failed to create bot match. Please try again.");
-            setGameState('LOBBY');
-          });
-        } catch (e: any) {
-          toast.error("Failed to create bot match. Please try again.");
-          setGameState('LOBBY');
-        }
-        return cleanup;
-      }
 
       // Set a 30-second timeout — if no real player found, create rank-based bot match
       matchmakingTimeoutRef.current = window.setTimeout(async () => {
