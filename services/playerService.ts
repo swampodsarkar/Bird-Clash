@@ -2,7 +2,7 @@
 import { rtdb, auth } from './firebase';
 import firebase from 'firebase/compat/app'; // Needed for ServerValue
 // Fix: Add StoreItem to type import.
-import type { Player, Match, MatchResult, MatchHistoryEntry, RoyalePassReward, Bird, Report, MailItem, StoreItem, MatchPlayer } from '../types';
+import type { Player, Match, MatchResult, MatchHistoryEntry, RoyalePassReward, Bird, Report, MailItem, StoreItem, MatchPlayer, GiftPayload } from '../types';
 import { CURRENT_ROYALE_PASS_SEASON, BIRD_DEFINITIONS, INSECT_DEFINITIONS } from '../constants';
 import { checkAndResetQuests, updateQuestProgress } from './questService';
 import { toast } from 'react-toastify';
@@ -623,6 +623,30 @@ export const listenToMail = (uid: string, callback: (mail: MailItem[]) => void) 
     };
     mailRef.on('value', listener);
     return () => mailRef.off('value', listener);
+};
+
+export const sendGiftToPlayer = async (sender: Player, recipientUid: string, giftPayload: GiftPayload, cost: { coins?: number; gems?: number }) => {
+    // Deduct cost from sender
+    const senderRef = rtdb.ref(`users/${sender.uid}`);
+    const { committed } = await senderRef.transaction(player => {
+        if (!player) return;
+        if (cost.coins && (player.coins || 0) < cost.coins) return;
+        if (cost.gems && (player.gems || 0) < cost.gems) return;
+        if (cost.coins) player.coins -= cost.coins;
+        if (cost.gems) player.gems -= cost.gems;
+        return player;
+    });
+    if (!committed) throw new Error("Not enough coins/gems to send gift.");
+
+    // Send mail to recipient
+    const mailItem: Omit<MailItem, 'id'> = {
+        type: 'gift',
+        message: `${sender.displayName} sent you a gift!`,
+        timestamp: Date.now(),
+        status: 'unread',
+        gift: giftPayload
+    };
+    await rtdb.ref(`mail/${recipientUid}`).push(mailItem);
 };
 
 export const claimMailItem = async (uid: string, mailId: string) => {

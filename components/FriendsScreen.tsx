@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Player, Friend, UserPresence } from '../types';
+import type { Player, Friend, UserPresence, GiftPayload } from '../types';
 import * as friendService from '../services/friendService';
 import * as playerService from '../services/playerService';
-import { searchPlayers } from '../services/playerService';
+import { searchPlayers, sendGiftToPlayer } from '../services/playerService';
 import Button from './common/Button';
 import { Spinner } from './common/Spinner';
 import { useAuth } from '../hooks/useAuth';
@@ -10,7 +10,8 @@ import PlayerAvatar from './common/PlayerAvatar';
 import { rtdb } from '../services/firebase';
 import firebase from 'firebase/compat/app';
 import { toast } from 'react-toastify';
-import { Heart } from 'lucide-react';
+import { Heart, Gift } from 'lucide-react';
+import { BIRD_DEFINITIONS, INSECT_DEFINITIONS } from '../constants';
 
 interface FriendsScreenProps {
   player: Player;
@@ -129,6 +130,7 @@ interface FriendListProps {
 const FriendList: React.FC<FriendListProps> = ({ player, onStartSpectating, onViewProfile }) => {
     const { friendList, presence, loading } = useFriends(player.uid);
     const [duoLoading, setDuoLoading] = useState<string | null>(null);
+    const [giftTarget, setGiftTarget] = useState<Friend | null>(null);
 
     const handleFormDuo = async (friend: Friend) => {
         if (player.dynamicDuo) {
@@ -157,7 +159,7 @@ const FriendList: React.FC<FriendListProps> = ({ player, onStartSpectating, onVi
     if (friendList.length === 0) return <p className="text-center text-gray-400 p-8">You have no friends yet. Go to the 'Add Friend' tab to find players!</p>
 
     return (
-        <div className="p-4 bg-[#2c2c54] border-2 border-black shadow-[4px_4px_0px_#000000] space-y-2">
+        <><div className="p-4 bg-[#2c2c54] border-2 border-black shadow-[4px_4px_0px_#000000] space-y-2">
             {friendList.map(friend => {
                 const friendPresence = presence[friend.uid];
                 const isOnline = friendPresence?.isOnline;
@@ -195,11 +197,135 @@ const FriendList: React.FC<FriendListProps> = ({ player, onStartSpectating, onVi
                             >
                                 {duoLoading === friend.uid ? <Spinner /> : <span className="flex items-center gap-1"><Heart size={12} fill="currentColor" /> Duo</span>}
                             </Button>
+                            <Button onClick={() => setGiftTarget(friend)} className="!py-1 !px-2 !text-xs !bg-green-600 hover:!bg-green-700" title="Send a gift">
+                                <Gift size={12} />
+                            </Button>
                             <Button onClick={() => friendService.declineOrRemoveFriend(player.uid, friend.uid)} variant="danger" className="!py-1 !px-2 !text-xs">Remove</Button>
                         </div>
                     </div>
                 );
             })}
+        </div>
+        {giftTarget && (
+            <FriendGiftModal
+                sender={player}
+                recipientUid={giftTarget.uid}
+                recipientDisplayName={giftTarget.displayName}
+                onClose={() => setGiftTarget(null)}
+            />
+        )}</>
+    );
+};
+
+const FriendGiftModal: React.FC<{ sender: Player; recipientUid: string; recipientDisplayName: string; onClose: () => void }> = ({ sender, recipientUid, recipientDisplayName, onClose }) => {
+    const [tab, setTab] = useState<'coins' | 'gems' | 'bird' | 'insect'>('coins');
+    const [giftCoinsAmount, setGiftCoinsAmount] = useState(100);
+    const [giftGemsAmount, setGiftGemsAmount] = useState(10);
+    const [birdItemId, setBirdItemId] = useState('B001');
+    const [insectItemId, setInsectItemId] = useState('I001');
+    const [insectAmount, setInsectAmount] = useState(1);
+    const [sending, setSending] = useState(false);
+
+    const birdDefs = Object.values(BIRD_DEFINITIONS);
+    const insectDefs = Object.values(INSECT_DEFINITIONS);
+
+    const handleSend = async () => {
+        setSending(true);
+        try {
+            let giftPayload: GiftPayload;
+            let cost: { coins?: number; gems?: number } = {};
+            switch (tab) {
+                case 'coins':
+                    if (giftCoinsAmount <= 0) throw new Error('Invalid amount');
+                    giftPayload = { type: 'coins', amount: giftCoinsAmount, name: `${giftCoinsAmount} Coins`, icon: '💰' };
+                    cost = { coins: giftCoinsAmount };
+                    break;
+                case 'gems':
+                    if (giftGemsAmount <= 0) throw new Error('Invalid amount');
+                    giftPayload = { type: 'gems', amount: giftGemsAmount, name: `${giftGemsAmount} Gems`, icon: '💎' };
+                    cost = { gems: giftGemsAmount };
+                    break;
+                case 'bird': {
+                    const birdDef = BIRD_DEFINITIONS[birdItemId];
+                    if (!birdDef) throw new Error('Invalid bird');
+                    giftPayload = { type: 'bird', itemId: birdItemId, name: birdDef.name, icon: birdDef.icon };
+                    cost = { coins: 1000 };
+                    break;
+                }
+                case 'insect': {
+                    const insectDef = INSECT_DEFINITIONS[insectItemId];
+                    if (!insectDef) throw new Error('Invalid insect');
+                    giftPayload = { type: 'insect', itemId: insectItemId, amount: insectAmount, name: `${insectAmount}x ${insectDef.name}`, icon: insectDef.icon };
+                    cost = { coins: insectDef.giftCost * insectAmount };
+                    break;
+                }
+                default:
+                    throw new Error('Invalid gift type');
+            }
+            await sendGiftToPlayer(sender, recipientUid, giftPayload, cost);
+            toast.success(`Gift sent to ${recipientDisplayName}!`);
+            onClose();
+        } catch (e: any) {
+            toast.error(e.message);
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4" onClick={onClose}>
+            <div className="w-full max-w-md p-4 bg-[#1a1a2e] border-2 border-black shadow-[6px_6px_0px_#000000] space-y-3" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-center">Send Gift to {recipientDisplayName}</h3>
+                <div className="flex border-b-2 border-black">
+                    {(['coins', 'gems', 'bird', 'insect'] as const).map(t => (
+                        <button key={t} onClick={() => setTab(t)}
+                            className={`w-1/4 py-1 font-bold text-xs transition-colors uppercase ${tab === t ? 'bg-green-600 text-white' : 'bg-[#2c2c54] text-white hover:bg-[#474787]'}`}>
+                            {t === 'coins' ? '💰 Coins' : t === 'gems' ? '💎 Gems' : t === 'bird' ? '🐦 Bird' : '🐛 Insect'}
+                        </button>
+                    ))}
+                </div>
+                <div className="space-y-2">
+                    {tab === 'coins' && (
+                        <div>
+                            <p className="text-xs text-gray-400 mb-1">Your Balance: {sender.coins}</p>
+                            <input type="number" value={giftCoinsAmount} onChange={e => setGiftCoinsAmount(Math.max(1, parseInt(e.target.value) || 0))} className="pixel-input w-full" min={1} max={sender.coins} />
+                            <p className="text-[10px] text-green-400 mt-1">Cost: {giftCoinsAmount} Gold</p>
+                        </div>
+                    )}
+                    {tab === 'gems' && (
+                        <div>
+                            <p className="text-xs text-gray-400 mb-1">Your Balance: {sender.gems} Gems</p>
+                            <input type="number" value={giftGemsAmount} onChange={e => setGiftGemsAmount(Math.max(1, parseInt(e.target.value) || 0))} className="pixel-input w-full" min={1} max={sender.gems} />
+                            <p className="text-[10px] text-green-400 mt-1">Cost: {giftGemsAmount} Gems</p>
+                        </div>
+                    )}
+                    {tab === 'bird' && (
+                        <div>
+                            <p className="text-xs text-gray-400 mb-1">Select Bird:</p>
+                            <select value={birdItemId} onChange={e => setBirdItemId(e.target.value)} className="pixel-input w-full">
+                                {birdDefs.map(b => <option key={b.id} value={b.id}>{b.icon} {b.name} ({b.rarity})</option>)}
+                            </select>
+                            <p className="text-[10px] text-green-400 mt-1">Cost: 1000 Gold</p>
+                        </div>
+                    )}
+                    {tab === 'insect' && (
+                        <div>
+                            <p className="text-xs text-gray-400 mb-1">Select Insect:</p>
+                            <select value={insectItemId} onChange={e => setInsectItemId(e.target.value)} className="pixel-input w-full mb-1">
+                                {insectDefs.map(i => <option key={i.id} value={i.id}>{i.icon} {i.name} ({i.giftCost} Gold each)</option>)}
+                            </select>
+                            <input type="number" value={insectAmount} onChange={e => setInsectAmount(Math.max(1, parseInt(e.target.value) || 0))} className="pixel-input w-full" min={1} />
+                            <p className="text-[10px] text-green-400 mt-1">Cost: {INSECT_DEFINITIONS[insectItemId]?.giftCost * insectAmount} Gold</p>
+                        </div>
+                    )}
+                </div>
+                <div className="flex gap-4 pt-2">
+                    <Button onClick={onClose} variant="secondary" className="w-full">Cancel</Button>
+                    <Button onClick={handleSend} disabled={sending} className="w-full !bg-green-600 hover:!bg-green-700">
+                        {sending ? <Spinner /> : "Send Gift"}
+                    </Button>
+                </div>
+            </div>
         </div>
     );
 };

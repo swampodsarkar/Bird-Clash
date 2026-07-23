@@ -517,7 +517,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             <MailboxModal isOpen={isMailboxOpen} onClose={handleToggleMailbox} player={playerData} globalNotifications={notifications} />
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
             <TopUpSelectionModal isOpen={isTopUpModalOpen} onClose={() => setIsTopUpModalOpen(false)} player={playerData} />
-            {viewingProfileUid && <PublicProfileScreen uid={viewingProfileUid} onClose={() => setViewingProfileUid(null)} />}
+            {viewingProfileUid && <PublicProfileScreen uid={viewingProfileUid} onClose={() => setViewingProfileUid(null)} sender={playerData} />}
             <MembershipClaimModal isOpen={!!membershipModalInfo} onClose={() => setMembershipModalInfo(null)} player={playerData} type={membershipModalInfo?.type || 'weekly'}/>
             <SeasonalEventModal isOpen={isWinterverseModalOpen} onClose={() => setIsWinterverseModalOpen(false)} />
             <EventsModal isOpen={isEventsModalOpen} onClose={() => setIsEventsModalOpen(false)} player={playerData} />
