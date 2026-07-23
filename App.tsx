@@ -25,6 +25,7 @@ import { ADMIN_UID, ADMIN_EMAIL, BIRD_DEFINITIONS } from './constants';
 import AdminView from './components/admin/AdminView';
 import Dashboard from './components/Dashboard';
 import PostLoginLoadingScreen from './components/common/PostLoginLoadingScreen';
+import SplashScreen from './components/common/SplashScreen';
 import PlayerAvatar from './components/common/PlayerAvatar';
 import UpdateRequiredScreen from './components/common/UpdateRequiredScreen';
 import CoinCollectorMinigame from './components/minigames/CoinCollectorMinigame';
@@ -123,6 +124,7 @@ const Game: React.FC = () => {
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [streakData, setStreakData] = useState<{ streak: LoginStreak; reward: { coins: number; gems: number } | null } | null>(null);
   const [showReferralModal, setShowReferralModal] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
 
   // Listen for player data changes
@@ -552,6 +554,10 @@ const Game: React.FC = () => {
   }
 
   const renderContent = () => {
+    if (showSplash) {
+      return <SplashScreen onComplete={() => setShowSplash(false)} />;
+    }
+    
     if (isLoadingAfterLogin) {
       return <PostLoginLoadingScreen onComplete={handleLoadingComplete} />;
     }
